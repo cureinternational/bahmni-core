@@ -5,6 +5,7 @@ import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.codehaus.jackson.map.annotate.JsonSerialize;
 import org.joda.time.DateTime;
 import org.openmrs.module.bahmniemrapi.accessionnote.contract.AccessionNote;
+import org.openmrs.module.bahmniemrapi.allergy.contract.BahmniAllergyRequest;
 import org.openmrs.module.bahmniemrapi.diagnosis.contract.BahmniDiagnosis;
 import org.openmrs.module.bahmniemrapi.diagnosis.contract.BahmniDiagnosisRequest;
 import org.openmrs.module.emrapi.encounter.domain.EncounterTransaction;
@@ -30,6 +31,7 @@ public class BahmniEncounterTransaction {
     private String visitType;
     private String patientId;
     private String reason;
+    private BahmniAllergyRequest allergy;
 
 
     public BahmniEncounterTransaction() {
@@ -382,6 +384,14 @@ public class BahmniEncounterTransaction {
 
     public boolean isAssociatedToPatientProgram() {
         return StringUtils.isNotBlank(getPatientProgramUuid());
+    }
+
+    public BahmniAllergyRequest getAllergy() {
+        return allergy;
+    }
+
+    public void setAllergy(BahmniAllergyRequest allergy) {
+        this.allergy = allergy;
     }
 }
 
