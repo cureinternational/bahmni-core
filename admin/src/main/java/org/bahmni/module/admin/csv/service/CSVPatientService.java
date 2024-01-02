@@ -73,6 +73,7 @@ public class CSVPatientService {
         patient.setPersonDateCreated(patientRow.getRegistrationDate());
 
         patientService.savePatient(patient);
+        patient.setDateCreated(patientRow.getRegistrationDate());
 
         return patient;
     }
