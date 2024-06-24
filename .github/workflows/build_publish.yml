@@ -25,9 +25,6 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 1.8
-          server-id: nexus-sonatype
-          server-username: NEXUS_USERNAME
-          server-password: NEXUS_PASSWORD
       - name: Cache Maven packages
         uses: actions/cache@v3
         with:
@@ -43,13 +40,30 @@ jobs:
         run: |
           sudo gem install compass -v 1.0.3
       - name: Build and deploy with Maven
-        run: |
-          PROJECT_VERSION=$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout)
-          if [[ "$PROJECT_VERSION" == *"-SNAPSHOT" ]]; then
-            ./mvnw --no-transfer-progress clean -U deploy
-          else
-            echo "❌ The current push is for release. So skipping build."
-          fi
+        run: ./mvnw --no-transfer-progress clean -U package
+
+      - name: List files in target directory
+        run: ls -al bahmni-core/bahmnicore-omod/target
+
+      - name: Create GitHub release
+        id: create_release
+        uses: actions/create-release@v1
         env:
-          NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
-          NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+            tag_name: v1.1.0.ipd
+            release_name: Release-v1.1.0.ipd
+            draft: false
+            prerelease: false
+
+      - name: Upload SNAPSHOT.omod to release
+        uses: actions/upload-release-asset@v1
+        env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+            upload_url: ${{ steps.create_release.outputs.upload_url }}
+            asset_path: bahmni-core/bahmnicore-omod/target/bahmnicore-omod-1.1.0.ipd-SNAPSHOT.omod
+            asset_name: bahmnicore-omod-1.1.0.ipd-SNAPSHOT.omod
+            asset_content_type: application/octet-stream
+
+
