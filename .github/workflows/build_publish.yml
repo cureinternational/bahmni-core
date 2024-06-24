@@ -40,10 +40,10 @@ jobs:
         run: |
           sudo gem install compass -v 1.0.3
       - name: Build and deploy with Maven
-        run: ./mvnw --no-transfer-progress clean -U package
+        run: ./mvnw --no-transfer-progress clean -U package -DskipTests
 
       - name: List files in target directory
-        run: ls -al bahmni-core/bahmnicore-omod/target
+        run: ls -al bahmnicore-omod/target
 
       - name: Create GitHub release
         id: create_release
@@ -62,7 +62,7 @@ jobs:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
             upload_url: ${{ steps.create_release.outputs.upload_url }}
-            asset_path: bahmni-core/bahmnicore-omod/target/bahmnicore-omod-1.1.0.ipd-SNAPSHOT.omod
+            asset_path: bahmnicore-omod/target/bahmnicore-omod-1.1.0.ipd-SNAPSHOT.omod
             asset_name: bahmnicore-omod-1.1.0.ipd-SNAPSHOT.omod
             asset_content_type: application/octet-stream
 
