@@ -42,9 +42,6 @@ jobs:
       - name: Build and deploy with Maven
         run: ./mvnw --no-transfer-progress clean -U package -DskipTests
 
-      - name: List files in target directory
-        run: ls -al bahmnicore-omod/target
-
       - name: Create GitHub release
         id: create_release
         uses: actions/create-release@v1
