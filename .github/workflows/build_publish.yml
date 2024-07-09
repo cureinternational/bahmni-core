@@ -41,27 +41,15 @@ jobs:
           sudo gem install compass -v 1.0.3
       - name: Build and deploy with Maven
         run: ./mvnw --no-transfer-progress clean -U package -DskipTests
-        
-      - name: Delete existing tag
-        run: |
-          git tag -d v1.1.0.ipd || true
-          git push origin :refs/tags/v1.1.0.ipd || true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Delete existing release
-        run: |
-          gh release delete v1.1.0.ipd -y
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Create GitHub release
         id: create_release
         uses: actions/create-release@v1
         env:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-            tag_name: v1.1.0.ipd
-            release_name: Release-v1.1.0.ipd
+            tag_name: v1.1.0.ipd-${{ github.run_number }}
+            release_name: Release-v1.1.0.ipd-${{ github.run_number }}
             draft: false
             prerelease: false
 
