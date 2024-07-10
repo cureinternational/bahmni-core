@@ -42,18 +42,26 @@ jobs:
       - name: Build and deploy with Maven
         run: ./mvnw --no-transfer-progress clean -U package -DskipTests
         
-      - name: Delete existing tag
-        run: |
-          git tag -d v1.1.0.ipd || true
-          git push origin :refs/tags/v1.1.0.ipd || true
+      - name: Delete Existing Release and Tag
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          release_name="Release-v1.1.0.ipd"
+          tag_name="v1.1.0.ipd"
 
-      - name: Delete existing release
-        run: |
-          gh release delete v1.1.0.ipd -y
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Fetch all releases and filter by release name to get the release ID
+          release_id=$(curl -s -X GET -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/${{ github.repository }}/releases" | jq -r --arg release_name "$release_name" '.[] | select(.name == $release_name) | .id')
+
+          if [ ! -z "$release_id" ] && [ "$release_id" != "null" ]; then
+            # Delete the release using the release ID
+            curl -s -X DELETE -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/${{ github.repository }}/releases/$release_id"
+            echo "Deleted release $release_name"
+          else
+            echo "No release found for $release_name to delete."
+          fi
+
+          # Attempt to delete the tag on the remote repository
+          git push --delete origin $tag_name || echo "Tag $tag_name not found on remote."
       - name: Create GitHub release
         id: create_release
         uses: actions/create-release@v1
