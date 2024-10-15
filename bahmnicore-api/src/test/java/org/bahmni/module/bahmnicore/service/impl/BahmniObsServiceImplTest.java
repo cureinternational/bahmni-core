@@ -3,6 +3,7 @@ package org.bahmni.module.bahmnicore.service.impl;
 import org.bahmni.module.bahmnicore.dao.ObsDao;
 import org.bahmni.module.bahmnicore.dao.VisitDao;
 import org.bahmni.module.bahmnicore.dao.impl.ObsDaoImpl;
+import org.bahmni.module.bahmnicore.service.BahmniConceptService;
 import org.bahmni.module.bahmnicore.service.BahmniObsService;
 import org.bahmni.module.bahmnicore.service.BahmniProgramWorkflowService;
 import org.bahmni.test.builder.ConceptBuilder;
@@ -73,6 +74,8 @@ public class BahmniObsServiceImplTest {
     private ObsService obsService;
     @Mock
     private OMRSObsToBahmniObsMapper omrsObsToBahmniObsMapper;
+    @Mock
+    private BahmniConceptService bahmniConceptService;
 
     @Before
     public void setUp() {
@@ -81,7 +84,7 @@ public class BahmniObsServiceImplTest {
         mockStatic(LocaleUtility.class);
         when(LocaleUtility.getDefaultLocale()).thenReturn(Locale.ENGLISH);
         when(observationTypeMatcher.getObservationType(any(Obs.class))).thenReturn(ObservationTypeMatcher.ObservationType.OBSERVATION);
-        bahmniObsService = new BahmniObsServiceImpl(obsDao, omrsObsToBahmniObsMapper, visitService, conceptService, visitDao, bahmniProgramWorkflowService, obsService);
+        bahmniObsService = new BahmniObsServiceImpl(obsDao, omrsObsToBahmniObsMapper, visitService, conceptService, visitDao, bahmniProgramWorkflowService, obsService, bahmniConceptService);
     }
 
     @Test
@@ -214,12 +217,12 @@ public class BahmniObsServiceImplTest {
         Obs obs = new Obs();
         BahmniObservation expectedBahmniObservation = new BahmniObservation();
         when(obsService.getObsByUuid(observationUuid)).thenReturn(obs);
-        when(omrsObsToBahmniObsMapper.map(obs)).thenReturn(expectedBahmniObservation);
+        when(omrsObsToBahmniObsMapper.map(obs, null)).thenReturn(expectedBahmniObservation);
 
         BahmniObservation actualBahmniObservation = bahmniObsService.getBahmniObservationByUuid(observationUuid);
 
         verify(obsService, times(1)).getObsByUuid(observationUuid);
-        verify(omrsObsToBahmniObsMapper, times(1)).map(obs);
+        verify(omrsObsToBahmniObsMapper, times(1)).map(obs, null);
         assertNotNull(actualBahmniObservation);
         assertEquals(expectedBahmniObservation, actualBahmniObservation);
     }
@@ -262,7 +265,7 @@ public class BahmniObsServiceImplTest {
         when(visitDao.getVisitIdsFor(patientUuid, numberOfVisits)).thenReturn(visitIds);
         when(obsDao.getObsForFormBuilderForms(patientUuid, formNames, visitIds, encounters, null, null))
                 .thenReturn(singletonList(observation));
-        when(omrsObsToBahmniObsMapper.map(observation)).thenReturn(bahmniObservation);
+        when(omrsObsToBahmniObsMapper.map(observation, null)).thenReturn(bahmniObservation);
 
         Collection<BahmniObservation> bahmniObservations = bahmniObsService.getObsForFormBuilderForms(patientUuid,
                 formNames, numberOfVisits, null, null, patientProgramUuid);
