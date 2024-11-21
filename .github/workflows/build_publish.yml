@@ -79,8 +79,8 @@ jobs:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
             upload_url: ${{ steps.create_release.outputs.upload_url }}
-            asset_path: bahmnicore-omod/target/bahmnicore-omod-1.1.0.ipd-SNAPSHOT.omod
-            asset_name: bahmnicore-omod-1.1.0.ipd-SNAPSHOT.omod
+            asset_path: bahmnicore-omod/target/bahmnicore-omod-1.3.0.ipd-SNAPSHOT.omod
+            asset_name: bahmnicore-omod-1.3.0.ipd-SNAPSHOT.omod
             asset_content_type: application/octet-stream
 
 
