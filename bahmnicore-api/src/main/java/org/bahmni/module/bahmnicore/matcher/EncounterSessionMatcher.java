@@ -151,11 +151,9 @@ public class EncounterSessionMatcher implements BaseEncounterMatcher {
     }
 
     private Date getSearchStartDate(Date endDate) {
-        Date startDate = DateUtils.addMinutes(endDate, getSessionDuration() * -1);
-        if (!DateUtils.isSameDay(startDate, endDate)) {
-            return DateUtils.truncate(endDate, Calendar.DATE);
-        }
-        return startDate;
+       
+        return DateUtils.addMinutes(endDate, getSessionDuration() * -1);
+
     }
 
     private EncounterType getEncounterType(EncounterParameters encounterParameters) {
