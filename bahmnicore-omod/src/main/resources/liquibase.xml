@@ -4652,6 +4652,7 @@
         </sql>
     </changeSet>
     <include file="addAtomfeedMigrations.xml"/>
+    <changeSet id="manage-patient-program-attribute-types-202310191156" author="Bindu">
     <changeSet id="provider-attribute-login-locations-202307191200" author="BAHMNI">
         <preConditions onFail="MARK_RAN">
             <sqlCheck expectedResult="0">
@@ -4695,9 +4696,8 @@
         <comment>Adding Manage Patient Program Attribute Types privilege</comment>
         <sql>
 
-            delete from privilege where privilege = 'Manage Program Attribute Types';
-
             delete from role_privilege where privilege = 'Manage Program Attribute Types';
+            delete from privilege where privilege = 'Manage Program Attribute Types';
 
             set @uuid = '';
             select uuid() into @uuid;
@@ -4709,7 +4709,7 @@
             insert ignore into role_privilege values('SuperAdmin', 'Manage Patient Program Attribute Types');
         </sql>
     </changeSet>
-    <changeSet id="get-patient-program-attribute-types-202310191511" author="Bindu">
+    <changeSet id="get-patient-program-attribute-types-202310191512" author="Bindu">
         <preConditions>
             <sqlCheck expectedResult="1">
                 select count(*) from privilege where privilege = 'View Program Attribute Types';
@@ -4721,9 +4721,8 @@
         <comment>Adding Get Patient Program Attribute Types privilege</comment>
         <sql>
 
-            delete from privilege where privilege = 'View Program Attribute Types';
-
             delete from role_privilege where privilege = 'View Program Attribute Types';
+            delete from privilege where privilege = 'View Program Attribute Types';
 
             set @uuid = '';
             select uuid() into @uuid;
@@ -4737,7 +4736,7 @@
         </sql>
     </changeSet>
 
-    <changeSet id="purge-patient-program-attribute-types-202310191514" author="Bindu">
+    <changeSet id="purge-patient-program-attribute-types-202310191515" author="Bindu">
         <preConditions>
             <sqlCheck expectedResult="1">
                 select count(*) from privilege where privilege = 'Purge Program Attribute Types';
@@ -4749,9 +4748,8 @@
         <comment>Adding Get Patient Program Attribute Types privilege</comment>
         <sql>
 
-            delete from privilege where privilege = 'Purge Program Attribute Types';
-
             delete from role_privilege where privilege = 'Purge Program Attribute Types';
+            delete from privilege where privilege = 'Purge Program Attribute Types';
 
             set @uuid = '';
             select uuid() into @uuid;
