@@ -79,6 +79,8 @@ public class EncounterSessionMatcher implements BaseEncounterMatcher {
             if (visit.getId() == null) { // To handle new Visit scenario where visit will not be persisted in DB and we toString a visit obj (Called from emr-api).
                 return null;
             }
+            // Reload visit from database to get fresh encounter list, avoiding stale in-memory collection
+            visit = Context.getVisitService().getVisit(visit.getId());
             visits = Arrays.asList(visit);
         }
 
