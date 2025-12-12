@@ -80,7 +80,7 @@ public class EncounterSessionMatcher implements BaseEncounterMatcher {
                 return null;
             }
             // Reload visit from database to get fresh encounter list, avoiding stale in-memory collection
-            visit = Context.getVisitService().getVisit(visit.getId());
+           // visit = Context.getVisitService().getVisit(visit.getId());
             visits = Arrays.asList(visit);
         }
 
