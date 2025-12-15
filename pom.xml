@@ -4,11 +4,20 @@
 
     <groupId>org.bahmni.module</groupId>
     <artifactId>bahmni</artifactId>
-    <version>1.3.0.ipd-SNAPSHOT</version>
+    <version>1.3.1.ipd-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>Bahmni EMR Core</name>
     <url>https://github.com/Bahmni/bahmni-core.git</url>
     <description>Bahmni core modules</description>
+
+    <!-- GitHub Maven Package Repository for distribution management -->
+    <distributionManagement>
+        <repository>
+            <id>github</id>
+            <name>GitHub Packages</name>
+            <url>https://maven.pkg.github.com/cureinternational/bahmni-core</url>
+        </repository>
+    </distributionManagement>
     <licenses>
         <license>
             <name>GNU AFFERO GENERAL PUBLIC LICENSE</name>
