@@ -186,9 +186,6 @@
         </profile>
         <profile>
 			<id>nexus-sonatype</id>
-			<activation>
-				<activeByDefault>true</activeByDefault>
-			</activation>
 			<distributionManagement>
 				<snapshotRepository>
 					<id>nexus-sonatype</id>
