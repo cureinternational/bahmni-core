@@ -75,7 +75,7 @@ public class ObsDaoImpl implements ObsDao {
     public List<Obs> getObsByPatientAndVisit(String patientUuid, List<String> conceptNames, List<Integer> listOfVisitIds,
                                              Integer limit, OrderBy sortOrder, List<String> obsIgnoreList, Boolean filterOutOrderObs, Order order, Date startDate, Date endDate) {
 
-        StringBuilder query = new StringBuilder("select distinctobs from Obs as obs, ConceptName as cn " +
+        StringBuilder query = new StringBuilder("select obs from Obs as obs, ConceptName as cn " +
                 " where obs.person.uuid = :patientUuid " +
                 " and cn.concept = obs.concept.conceptId " +
                 " and cn.name in (:conceptNames) " +
