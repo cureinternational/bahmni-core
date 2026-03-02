@@ -168,6 +168,11 @@
 		<profile>
 			<id>mybahmni-s3</id>
 			<distributionManagement>
+                <repository>
+                    <id>github</id>
+                    <name>GitHub Packages</name>
+                    <url>https://maven.pkg.github.com/cureinternational/bahmni-core</url>
+                </repository>
 				<snapshotRepository>
 					<id>repo.mybahmni.org</id>
 					<name>bahmni-artifactory-snapshots</name>
