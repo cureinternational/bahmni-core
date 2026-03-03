@@ -9,6 +9,16 @@
     <name>Bahmni EMR Core</name>
     <url>https://github.com/Bahmni/bahmni-core.git</url>
     <description>Bahmni core modules</description>
+
+    <!-- GitHub Maven Package Repository for distribution management -->
+    <distributionManagement>
+        <repository>
+            <id>github</id>
+            <name>GitHub Packages</name>
+            <url>https://maven.pkg.github.com/cureinternational/bahmni-core</url>
+        </repository>
+    </distributionManagement>
+
     <licenses>
         <license>
             <name>GNU AFFERO GENERAL PUBLIC LICENSE</name>
@@ -115,6 +125,16 @@
                     <value>true</value>
                 </property>
             </activation>
+            <distributionManagement>
+                <snapshotRepository>
+                    <id>nexus-sonatype</id>
+                    <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+                </snapshotRepository>
+                <repository>
+                    <id>nexus-sonatype</id>
+                    <url>https://oss.sonatype.org/service/local/staging/deploy/maven2</url>
+                </repository>
+            </distributionManagement>
             <build>
                 <plugins>
                     <plugin>
@@ -165,21 +185,29 @@
                 </plugins>
             </build>
         </profile>
-		<profile>
-			<id>mybahmni-s3</id>
-			<distributionManagement>
+        <profile>
+            <id>nexus-sonatype</id>
+            <distributionManagement>
+                <snapshotRepository>
+                    <id>nexus-sonatype</id>
+                    <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+                </snapshotRepository>
                 <repository>
-                    <id>github</id>
-                    <name>GitHub Packages</name>
-                    <url>https://maven.pkg.github.com/cureinternational/bahmni-core</url>
+                    <id>nexus-sonatype</id>
+                    <url>https://oss.sonatype.org/service/local/staging/deploy/maven2</url>
                 </repository>
-				<snapshotRepository>
-					<id>repo.mybahmni.org</id>
-					<name>bahmni-artifactory-snapshots</name>
-					<url>s3://repo.mybahmni.org/artifactory/snapshot</url>
-				</snapshotRepository>
-			</distributionManagement>
-		</profile>
+            </distributionManagement>
+        </profile>
+        <profile>
+            <id>mybahmni-s3</id>
+            <distributionManagement>
+                <snapshotRepository>
+                    <id>repo.mybahmni.org</id>
+                    <name>bahmni-artifactory-snapshots</name>
+                    <url>s3://repo.mybahmni.org/artifactory/snapshot</url>
+                </snapshotRepository>
+            </distributionManagement>
+        </profile>
     </profiles>
     <dependencyManagement>
         <dependencies>
