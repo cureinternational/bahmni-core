@@ -4,7 +4,7 @@
 
     <groupId>org.bahmni.module</groupId>
     <artifactId>bahmni</artifactId>
-    <version>2.0.0-SNAPSHOT</version>
+    <version>2.0.0.ipd-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>Bahmni EMR Core</name>
     <url>https://github.com/Bahmni/bahmni-core.git</url>
@@ -168,6 +168,11 @@
 		<profile>
 			<id>mybahmni-s3</id>
 			<distributionManagement>
+                <repository>
+                    <id>github</id>
+                    <name>GitHub Packages</name>
+                    <url>https://maven.pkg.github.com/cureinternational/bahmni-core</url>
+                </repository>
 				<snapshotRepository>
 					<id>repo.mybahmni.org</id>
 					<name>bahmni-artifactory-snapshots</name>
