@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.initMocks;
 
@@ -107,6 +108,50 @@ public class LabOrderResultsServiceImplTest {
         List<LabOrderResult> results = labOrderResultsServiceImpl.mapOrdersWithObs(testOrders, new ArrayList<EncounterTransaction.Observation>(), orderToEncounterMapping, new HashMap(), new HashMap());
 
         assertEquals(0, results.size());
+    }
+
+    @Test
+    public void mapOrdersWithObsShouldSetCommentToFulfillerForOrderWithoutResult() {
+        EncounterTransaction.Order order = createOrder("uuid1", "concept1", Order.Action.NEW.toString(), null);
+        order.setCommentToFulfiller("Requested by Other Doctor");
+        Map<String, Encounter> orderToEncounterMapping = new HashMap<>();
+        orderToEncounterMapping.put(order.getUuid(), encounter);
+
+        List<LabOrderResult> results = labOrderResultsServiceImpl.mapOrdersWithObs(
+                Arrays.asList(order), new ArrayList<EncounterTransaction.Observation>(), orderToEncounterMapping, new HashMap(), new HashMap());
+
+        assertEquals(1, results.size());
+        assertEquals("Requested by Other Doctor", results.get(0).getCommentToFulfiller());
+    }
+
+    @Test
+    public void mapOrdersWithObsShouldSetCommentToFulfillerForOrderWithResult() {
+        EncounterTransaction.Order order = createOrder("uuid1", "concept1", Order.Action.NEW.toString(), null);
+        order.setCommentToFulfiller("Urgent test required");
+        EncounterTransaction.Observation obs = createObservation("obs1", order.getUuid());
+        Map<String, Encounter> orderToEncounterMapping = new HashMap<>();
+        orderToEncounterMapping.put(order.getUuid(), encounter);
+        Map<String, Encounter> obsToEncounterMapping = new HashMap<>();
+        obsToEncounterMapping.put(obs.getUuid(), encounter);
+
+        List<LabOrderResult> results = labOrderResultsServiceImpl.mapOrdersWithObs(
+                Arrays.asList(order), Arrays.asList(obs), orderToEncounterMapping, obsToEncounterMapping, new HashMap());
+
+        assertEquals(1, results.size());
+        assertEquals("Urgent test required", results.get(0).getCommentToFulfiller());
+    }
+
+    @Test
+    public void mapOrdersWithObsShouldSetNullCommentToFulfillerWhenOrderHasNoComment() {
+        EncounterTransaction.Order order = createOrder("uuid1", "concept1", Order.Action.NEW.toString(), null);
+        Map<String, Encounter> orderToEncounterMapping = new HashMap<>();
+        orderToEncounterMapping.put(order.getUuid(), encounter);
+
+        List<LabOrderResult> results = labOrderResultsServiceImpl.mapOrdersWithObs(
+                Arrays.asList(order), new ArrayList<EncounterTransaction.Observation>(), orderToEncounterMapping, new HashMap(), new HashMap());
+
+        assertEquals(1, results.size());
+        assertNull(results.get(0).getCommentToFulfiller());
     }
 
     private EncounterTransaction.Order createOrder(String uuid, String conceptName, String action, Date dateStopped) {
