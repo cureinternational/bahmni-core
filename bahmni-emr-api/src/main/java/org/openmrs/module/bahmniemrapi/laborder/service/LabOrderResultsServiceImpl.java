@@ -225,6 +225,7 @@ public class LabOrderResultsServiceImpl implements LabOrderResultsService {
                 EncounterTransaction.Concept orderConcept = testOrder.getConcept();
                 Encounter orderEncounter = encounterTestOrderMap.get(testOrder.getUuid());
                 LabOrderResult labOrderResult = new LabOrderResult(testOrder.getUuid(), testOrder.getAction(), orderEncounter.getUuid(), orderEncounter.getEncounterDatetime(), orderConcept.getName(), orderConcept.getUnits(), null, null, null, null, false, null, null);
+                labOrderResult.setCommentToFulfiller(testOrder.getCommentToFulfiller());
                 if(testOrder.getConcept().getShortName() != null) {
                     labOrderResult.setPreferredTestName(testOrder.getConcept().getShortName());
                 }
@@ -263,6 +264,7 @@ public class LabOrderResultsServiceImpl implements LabOrderResultsService {
         Encounter orderEncounter = encounterTestOrderMap.get(observation.getOrderUuid());
         Object resultValue = getValue(observation, observation.getConcept().getName());
         String notes = (String) getValue(observation, LAB_NOTES);
+        labOrderResult.setCommentToFulfiller(testOrder.getCommentToFulfiller());
         String uploadedFileName = (String) getValue(observation, LAB_REPORT);
         labOrderResult.setAccessionUuid(orderEncounter.getUuid());
         labOrderResult.setAccessionDateTime(orderEncounter.getEncounterDatetime());

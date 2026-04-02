@@ -29,6 +29,7 @@ public class LabOrderResult {
     private String uploadedFileName;
     private String preferredTestName;
     private String preferredPanelName;
+    private String commentToFulfiller;
 
     public LabOrderResult() {
     }
@@ -231,5 +232,13 @@ public class LabOrderResult {
 
     public void setPreferredPanelName(String preferredPanelName) {
         this.preferredPanelName = preferredPanelName;
+    }
+
+    public String getCommentToFulfiller() {
+        return commentToFulfiller;
+    }
+
+    public void setCommentToFulfiller(String commentToFulfiller) {
+        this.commentToFulfiller = commentToFulfiller;
     }
 }
