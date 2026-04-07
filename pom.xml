@@ -806,6 +806,11 @@
                <updatePolicy>always</updatePolicy>
            </snapshots>
        </repository>
+        <repository>
+            <id>github</id>
+            <name>GitHub Packages</name>
+            <url>https://maven.pkg.github.com/cureinternational/openmrs-module-rulesengine</url>
+        </repository>
     <repository>
           <id>repo.mybahmni.org-release</id>
           <name>bahmni-artifactory-release</name>
