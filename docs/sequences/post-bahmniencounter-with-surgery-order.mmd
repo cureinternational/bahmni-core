@@ -1,0 +1,114 @@
+sequenceDiagram
+    participant Client
+    participant BahmniEncounterController
+    participant BahmniEncounterTransactionService as Service
+    participant EmrEncounterService
+    participant EncounterService
+    participant CreateSurgeryOrderCommand as SurgeryCmd
+    participant SurgeryOrderService
+    participant ObsService
+    database Database
+
+    autonumber
+    rect rgb(200, 220, 255)
+    note over Client, Database: CURRENT WORKFLOW
+    end
+
+    Client->>BahmniEncounterController: POST /bahmnicore/bahmniencounter<br/>{..., surgeryId: "XYZ123"} (Optional)
+
+    BahmniEncounterController->>BahmniEncounterController: setUuidsForObservations()
+
+    BahmniEncounterController->>Service: save(BahmniEncounterTransaction)
+    activate Service
+
+    Service->>EncounterService: getPatientByUuid()
+    EncounterService->>Database: Query Patient
+    Database-->>EncounterService: Patient
+
+    Service->>Service: setEncounterDateTime()
+    Service->>Service: handleDrugOrders()
+    Service->>Service: setEncounterTypeUuid()
+    Service->>Service: setVisitType()
+    Service->>Service: setEncounterType()
+
+    Service->>Service: Execute PreSaveCommands
+
+    alt Is Retrospective Entry
+        Service->>Service: updatePastEncounters()
+    end
+
+    Service->>Service: setVisitLocationToEncounterTransaction()
+
+    Service->>EmrEncounterService: save(EncounterTransaction)
+    EmrEncounterService->>Database: Save Encounter & Obs
+    Database-->>EmrEncounterService: Encounter UUID
+
+    Service->>EncounterService: getEncounterByUuid()
+    EncounterService->>Database: Query Encounter
+    Database-->>EncounterService: Encounter Object
+
+    autonumber 21
+    rect rgb(220, 255, 220)
+    note over Client, Database: NEW WORKFLOW - SURGERY ORDER CREATION
+    end
+
+    Service->>Service: Execute PostSaveCommands
+    note over Service: Includes CreateSurgeryOrderCommand
+
+    Service->>SurgeryCmd: save(BET, Encounter, EncounterTransaction)
+    activate SurgeryCmd
+
+    alt surgeryId is Present
+        SurgeryCmd->>SurgeryCmd: Extract surgeryId from Request
+
+        SurgeryCmd->>EncounterService: Get Visit from Encounter
+        EncounterService->>Database: Query Visit
+        Database-->>EncounterService: Visit Object
+
+        SurgeryCmd->>SurgeryOrderService: createSurgeryOrder(visitId, encounterId, surgeryId)
+        activate SurgeryOrderService
+
+        SurgeryOrderService->>Database: Save SurgeryOrder<br/>(visit_id, encounter_id, surgery_id)
+        Database-->>SurgeryOrderService: SurgeryOrder with orderId
+
+        SurgeryOrderService-->>SurgeryCmd: SurgeryOrder
+
+        deactivate SurgeryOrderService
+
+        SurgeryCmd->>ObsService: addSurgeryObservation(encounterId, surgeryId, orderId)
+        activate ObsService
+
+        ObsService->>Database: Create Obs Entry<br/>(encounter_id, concept=Surgery,<br/>value=surgeryId, obs_order_id=orderId)
+        Database-->>ObsService: Obs Created
+
+        deactivate ObsService
+
+        SurgeryCmd->>SurgeryCmd: Update Surgery Record with orderId
+
+    else surgeryId is NOT Present
+        note over SurgeryCmd: Skip surgery order creation
+    end
+
+    SurgeryCmd-->>Service: UpdatedEncounterTransaction
+
+    deactivate SurgeryCmd
+
+    Service->>Service: saveVisitAttributes()
+    Service->>Service: Map to BahmniEncounterTransaction
+
+    deactivate Service
+
+    Service-->>BahmniEncounterController: BahmniEncounterTransaction
+
+    BahmniEncounterController-->>Client: 200 OK<br/>{..., surgeryId, orderId}
+
+    note over Database
+        **Obs Table Entry:**
+        encounter_id, concept_id=Surgery
+        value_text=surgeryId
+        obs_order_id=surgery_order.id
+
+        **Surgery Order Table:**
+        id, uuid, visit_id, encounter_id
+        surgery_id, order_date
+    end note

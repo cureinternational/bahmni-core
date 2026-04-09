@@ -1,0 +1,113 @@
+@startuml POST_BahmniEncounter_Flow
+'!define DIRECTION top to bottom
+skinparam backgroundColor #FEFEFE
+skinparam classBackgroundColor #F4F4F4
+skinparam classBorderColor #333333
+skinparam arrowColor #333333
+skinparam sequenceActorBorderColor #333333
+skinparam sequenceActorBackgroundColor #F4F4F4
+skinparam sequenceParticipantBorderColor #333333
+skinparam sequenceParticipantBackgroundColor #F4F4F4
+skinparam sequenceGroupBorderColor #FF6655
+skinparam sequenceGroupHeaderBackgroundColor #FF6655
+skinparam sequenceGroupFontColor #FFFFFF
+
+actor Client as client
+participant "BahmniEncounterController" as controller
+participant "BahmniEncounterTransactionService" as service
+participant "EmrEncounterService" as emrService
+participant "EncounterService" as encounterService
+database "Database" as db
+
+client -> controller: POST /bahmnicore/bahmniencounter\nBahmniEncounterTransaction
+activate controller
+
+controller -> controller: setUuidsForObservations()
+activate controller
+deactivate controller
+
+controller -> service: save(BahmniEncounterTransaction)
+activate service
+
+service -> encounterService: getPatientByUuid()
+activate encounterService
+encounterService -> db: Query Patient
+activate db
+db --> encounterService: Patient
+deactivate db
+deactivate encounterService
+
+service -> service: save(BET, Patient, null, null)
+activate service
+
+service -> service: setEncounterDateTime()
+activate service
+deactivate service
+
+service -> service: handleDrugOrders()
+activate service
+deactivate service
+
+service -> service: setEncounterTypeUuid()
+activate service
+deactivate service
+
+service -> service: setVisitType()
+activate service
+deactivate service
+
+service -> service: setEncounterType()
+activate service
+deactivate service
+
+service -> service: Execute PreSaveCommands
+activate service
+deactivate service
+
+alt Is Retrospective Entry
+    service -> service: updatePastEncounters()
+    activate service
+    deactivate service
+end
+
+service -> service: setVisitLocationToEncounterTransaction()
+activate service
+deactivate service
+
+service -> emrService: save(EncounterTransaction)
+activate emrService
+emrService -> db: Save Encounter & Observations
+activate db
+db --> emrService: Encounter UUID
+deactivate db
+deactivate emrService
+
+service -> encounterService: getEncounterByUuid()
+activate encounterService
+encounterService -> db: Query Encounter
+activate db
+db --> encounterService: Encounter Object
+deactivate db
+deactivate encounterService
+
+service -> service: Execute PostSaveCommands
+activate service
+deactivate service
+
+service -> service: saveVisitAttributes()
+activate service
+deactivate service
+
+service -> service: Map to BahmniEncounterTransaction
+activate service
+deactivate service
+
+deactivate service
+
+service --> controller: BahmniEncounterTransaction
+deactivate service
+
+controller --> client: 200 OK\nBahmniEncounterTransaction
+deactivate controller
+
+@enduml

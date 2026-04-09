@@ -1,0 +1,50 @@
+sequenceDiagram
+    participant Client
+    participant BahmniEncounterController
+    participant BahmniEncounterTransactionService
+    participant EmrEncounterService
+    participant EncounterService
+    participant Database
+
+    Client->>BahmniEncounterController: POST /bahmnicore/bahmniencounter<br/>BahmniEncounterTransaction
+
+    BahmniEncounterController->>BahmniEncounterController: setUuidsForObservations()
+
+    BahmniEncounterController->>BahmniEncounterTransactionService: save(BahmniEncounterTransaction)
+
+    BahmniEncounterTransactionService->>EncounterService: getPatientByUuid()
+    EncounterService->>Database: Query Patient
+    Database-->>EncounterService: Patient
+
+    BahmniEncounterTransactionService->>BahmniEncounterTransactionService: save(BET, Patient, null, null)
+
+    BahmniEncounterTransactionService->>BahmniEncounterTransactionService: setEncounterDateTime()
+    BahmniEncounterTransactionService->>BahmniEncounterTransactionService: handleDrugOrders()
+    BahmniEncounterTransactionService->>BahmniEncounterTransactionService: setEncounterTypeUuid()
+    BahmniEncounterTransactionService->>BahmniEncounterTransactionService: setVisitType()
+    BahmniEncounterTransactionService->>BahmniEncounterTransactionService: setEncounterType()
+
+    BahmniEncounterTransactionService->>BahmniEncounterTransactionService: Execute PreSaveCommands
+
+    alt Is Retrospective Entry
+        BahmniEncounterTransactionService->>BahmniEncounterTransactionService: updatePastEncounters()
+    end
+
+    BahmniEncounterTransactionService->>BahmniEncounterTransactionService: setVisitLocationToEncounterTransaction()
+
+    BahmniEncounterTransactionService->>EmrEncounterService: save(EncounterTransaction)
+    EmrEncounterService->>Database: Save Encounter & Obs
+    Database-->>EmrEncounterService: Encounter UUID
+
+    BahmniEncounterTransactionService->>EncounterService: getEncounterByUuid()
+    EncounterService->>Database: Query Encounter
+    Database-->>EncounterService: Encounter Object
+
+    BahmniEncounterTransactionService->>BahmniEncounterTransactionService: Execute PostSaveCommands
+    BahmniEncounterTransactionService->>BahmniEncounterTransactionService: saveVisitAttributes()
+
+    BahmniEncounterTransactionService->>BahmniEncounterTransactionService: Map to BahmniEncounterTransaction
+
+    BahmniEncounterTransactionService-->>BahmniEncounterController: BahmniEncounterTransaction
+
+    BahmniEncounterController-->>Client: 200 OK<br/>BahmniEncounterTransaction
