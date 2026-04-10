@@ -44,12 +44,12 @@ As an IPD nurse, I want to see care instructions in the IPD care view so that I 
 
 ### Affected Files
 
-**openmrs-module-ipd (backend)**
+**bahmnicore-omod (backend)**
 | File | Change Type |
 |------|-------------|
-| `omod/src/main/java/.../web/controller/IPDCareInstructionsController.java` | Create — new REST controller |
-| `omod/src/main/java/.../web/contract/CareInstructionsBatchRequest.java` | Create — request DTO |
-| `omod/src/main/java/.../web/contract/VisitObservationsResponse.java` | Create — response DTO |
+| `src/main/java/.../web/v1_0/controller/display/controls/BahmniObservationsController.java` | Modify — add POST /batch endpoint |
+| `src/main/java/.../web/contract/BahmniObservationsBatchRequest.java` | Create — request DTO |
+| `src/main/java/.../web/contract/VisitObservationsResponse.java` | Create — response DTO |
 
 **openmrs-module-ipd-frontend**
 | File | Change Type |
@@ -108,21 +108,38 @@ Single HTTP call for the entire ward page. Frontend sends all patient visit UUID
 
 ---
 
-#### Backend: New endpoint in openmrs-module-ipd
+#### Backend: New POST Batch Endpoint in bahmnicore-omod (BahmniObservationsController)
 
-**API Contract:**
+**Context:** Extends the existing `BahmniObservationsController` which already handles observations by `visitUuid` (GET endpoint at lines 98-115). The new POST batch endpoint reuses the same service methods, accepting a list of visitUuids and all optional filtering parameters.
+
+**Existing GET Endpoint** (lines 98-115):
+```java
+@RequestMapping(method = RequestMethod.GET, params = {"visitUuid"})
+public Collection<BahmniObservation> get(
+    @RequestParam(value = "visitUuid", required = true) String visitUuid,
+    @RequestParam(value = "scope", required = false) String scope,
+    @RequestParam(value = "concept", required = false) List<String> conceptNames,
+    @RequestParam(value = "obsIgnoreList", required = false) List<String> obsIgnoreList,
+    @RequestParam(value = "filterObsWithOrders", required = false, defaultValue = "true") Boolean filterObsWithOrders
+)
+```
+
+**API Contract — New POST Batch Endpoint:**
 
 ```
-POST /openmrs/ws/rest/v1/ipd/careInstructions/batch
+POST /rest/v1/bahmnicore/observations/batch
 Content-Type: application/json
+```
 
+**Request** (with all parameters):
+```json
 {
   "visitUuids": [
     "visit-aaa",
     "visit-bbb",
     "visit-ccc"
   ],
-  "conceptNames": [
+  "concept": [
     "Physician Orders Comments",
     "Instruction for the Ward",
     "Post Operative Order Comments",
@@ -135,7 +152,18 @@ Content-Type: application/json
     "NPO Breast Milk Until",
     "NPO Cow's Milk / Food Until",
     "NPO Early Breakfast Until"
-  ]
+  ],
+  "scope": "latest",
+  "obsIgnoreList": [],
+  "filterObsWithOrders": true
+}
+```
+
+**Request** (minimal - only required params):
+```json
+{
+  "visitUuids": ["visit-aaa", "visit-bbb", "visit-ccc"],
+  "concept": ["Physician Orders Comments", "Instruction for the Ward"]
 }
 ```
 
@@ -175,12 +203,33 @@ Content-Type: application/json
 ]
 ```
 
-**Request DTO** `CareInstructionsBatchRequest.java`:
+**Request DTO** `BahmniObservationsBatchRequest.java`:
 ```java
-public class CareInstructionsBatchRequest {
-    private List<String> visitUuids;
-    private List<String> conceptNames;
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class BahmniObservationsBatchRequest {
+    private List<String> visitUuids;              // REQUIRED: list of visit UUIDs
+    private List<String> concept;                 // OPTIONAL: concept names to filter
+    private String scope;                         // OPTIONAL: "latest", "initial", or null for all
+    private List<String> obsIgnoreList;           // OPTIONAL: concept names to ignore
+    private Boolean filterObsWithOrders;          // OPTIONAL: default true on backend
+
+    public BahmniObservationsBatchRequest() {}
+
     // getters + setters
+    public List<String> getVisitUuids() { return visitUuids; }
+    public void setVisitUuids(List<String> visitUuids) { this.visitUuids = visitUuids; }
+
+    public List<String> getConcept() { return concept; }
+    public void setConcept(List<String> concept) { this.concept = concept; }
+
+    public String getScope() { return scope; }
+    public void setScope(String scope) { this.scope = scope; }
+
+    public List<String> getObsIgnoreList() { return obsIgnoreList; }
+    public void setObsIgnoreList(List<String> obsIgnoreList) { this.obsIgnoreList = obsIgnoreList; }
+
+    public Boolean getFilterObsWithOrders() { return filterObsWithOrders != null ? filterObsWithOrders : true; }
+    public void setFilterObsWithOrders(Boolean filterObsWithOrders) { this.filterObsWithOrders = filterObsWithOrders; }
 }
 ```
 
@@ -189,31 +238,78 @@ public class CareInstructionsBatchRequest {
 public class VisitObservationsResponse {
     private String visitUuid;
     private Collection<BahmniObservation> observations;
-    // constructor + getters
+
+    public VisitObservationsResponse() {}
+
+    public VisitObservationsResponse(String visitUuid, Collection<BahmniObservation> observations) {
+        this.visitUuid = visitUuid;
+        this.observations = observations;
+    }
+
+    public String getVisitUuid() { return visitUuid; }
+    public void setVisitUuid(String visitUuid) { this.visitUuid = visitUuid; }
+
+    public Collection<BahmniObservation> getObservations() { return observations; }
+    public void setObservations(Collection<BahmniObservation> observations) { this.observations = observations; }
 }
 ```
 
-**Controller** `IPDCareInstructionsController.java`:
+**Controller Method** (in `BahmniObservationsController.java`):
 ```java
-@RequestMapping(value = "/careInstructions/batch", method = RequestMethod.POST)
+@RequestMapping(value = "/batch", method = RequestMethod.POST)
 @ResponseBody
-public List<VisitObservationsResponse> getBatchCareInstructions(
-    @RequestBody CareInstructionsBatchRequest request
+public List<VisitObservationsResponse> getBatchObservations(
+    @RequestBody BahmniObservationsBatchRequest request
 ) {
+    Visit visit;
+    List<Concept> concepts = MiscUtils.getConceptsForNames(request.getConcept(), conceptService);
+    List<Concept> obsIgnoreConcepts = MiscUtils.getConceptsForNames(request.getObsIgnoreList(), conceptService);
+    Boolean filterObsWithOrders = request.getFilterObsWithOrders();
+
     return request.getVisitUuids().stream()
-        .map(visitUuid -> new VisitObservationsResponse(
-            visitUuid,
-            bahmniObsService.getObservationForVisit(
-                visitUuid,
-                request.getConceptNames(),
-                null,
-                true,
-                null
-            )
-        ))
+        .map(visitUuid -> {
+            visit = visitService.getVisitByUuid(visitUuid);
+            Collection<BahmniObservation> observations;
+
+            if (ObjectUtils.equals(request.getScope(), "INITIAL")) {
+                observations = bahmniObsService.getInitialObsByVisit(
+                    visit,
+                    concepts,
+                    request.getObsIgnoreList(),
+                    filterObsWithOrders
+                );
+            } else if (ObjectUtils.equals(request.getScope(), "LATEST")) {
+                observations = bahmniObsService.getLatestObsByVisit(
+                    visit,
+                    concepts,
+                    request.getObsIgnoreList(),
+                    filterObsWithOrders
+                );
+            } else {
+                // Default: return all observations for the specified concepts
+                observations = bahmniObsService.getObservationForVisit(
+                    visitUuid,
+                    request.getConcept(),
+                    obsIgnoreConcepts,
+                    filterObsWithOrders,
+                    null
+                );
+            }
+
+            return new VisitObservationsResponse(visitUuid, observations);
+        })
         .collect(Collectors.toList());
 }
 ```
+
+**Key Design Decisions:**
+- ✅ New POST endpoint `/batch` in existing `BahmniObservationsController`
+- ✅ `@JsonInclude(NON_NULL)` ensures optional params omitted from response if not provided
+- ✅ Backend defaults `filterObsWithOrders` to `true` if null
+- ✅ Reuses all existing `BahmniObsService` methods (getInitialObsByVisit, getLatestObsByVisit, getObservationForVisit)
+- ✅ Applies optional parameters consistently across all visitUuids
+- ✅ No duplicate logic — mirrors GET endpoint behavior exactly
+- ✅ Single HTTP call for entire ward page (10+ patients)
 
 ---
 
@@ -221,21 +317,39 @@ public List<VisitObservationsResponse> getBatchCareInstructions(
 
 **`constants.js`** — new URL constant:
 ```javascript
-export const CARE_INSTRUCTIONS_BATCH_URL =
-  RESTWS_V1 + "/ipd/careInstructions/batch";
+export const OBSERVATIONS_BATCH_URL =
+  "/rest/" + RESTWS_V1 + "/bahmnicore/observations/batch";
 ```
 
-**`CareInstructionsUtils.jsx`** — new batch fetch function:
+**`CareInstructionsUtils.jsx`** — new batch fetch function (respects optional params):
 ```javascript
-export const fetchCareInstructionsObsBatch = async (visitUuids, conceptNames) => {
+export const fetchBatchObservations = async (visitUuids, concepts, options = {}) => {
   try {
+    // Build request body with only provided optional params
+    const request = {
+      visitUuids,
+      concept: concepts
+    };
+
+    // Only add optional params if explicitly provided (not sent as null/undefined)
+    if (options.scope) {
+      request.scope = options.scope;
+    }
+    if (options.obsIgnoreList?.length > 0) {
+      request.obsIgnoreList = options.obsIgnoreList;
+    }
+    if (options.filterObsWithOrders !== undefined) {
+      request.filterObsWithOrders = options.filterObsWithOrders;
+    }
+
     const response = await axios.post(
-      CARE_INSTRUCTIONS_BATCH_URL,
-      { visitUuids, conceptNames },
+      OBSERVATIONS_BATCH_URL,
+      request,
       { withCredentials: true }
     );
     return response.data; // [{ visitUuid, observations[] }, ...]
   } catch (error) {
+    console.error("Failed to fetch observations batch", error);
     return [];
   }
 };
@@ -250,10 +364,11 @@ const fetchCareInstructionsCount = async (patients) => {
   const formConcepts = ciSection?.config?.formConcepts ?? [];
   if (formConcepts.length === 0) return;
 
-  const conceptNames = [...new Set(formConcepts.flatMap(fc => fc.concepts))];
+  const concepts = [...new Set(formConcepts.flatMap(fc => fc.concepts))];
   const visitUuids = patients.map(p => p.visitDetails.uuid);
 
-  const batchResult = await fetchCareInstructionsObsBatch(visitUuids, conceptNames);
+  // Call batch API with only required params; optional params are omitted
+  const batchResult = await fetchBatchObservations(visitUuids, concepts);
 
   const countMap = {};
   batchResult.forEach(({ visitUuid, observations }) => {
@@ -328,12 +443,22 @@ useEffect(() => {
 ---
 
 **Pros:**
-- 1 HTTP call for all patients on the page (vs N calls)
-- POST body cleanly separates `visitUuids` and `conceptNames` — no URL length issues
-- Backend filters obs by concept before returning — no excess data
-- Reuses existing `mapObservationsToInstructions` utility for counting
-- No config changes needed — `formConcepts` already in `ipdConfig`
-- Follows existing batch endpoint pattern in `openmrs-module-ipd`
+- ✅ 1 HTTP call for all patients on the page (vs N calls)
+- ✅ POST body cleanly separates required + optional params — no URL length issues
+- ✅ Backend filters obs by concept before returning — no excess data
+- ✅ Reuses existing `mapObservationsToInstructions` utility for counting
+- ✅ No config changes needed — `formConcepts` already in `ipdConfig`
+- ✅ Extends existing `BahmniObservationsController` — no new controller
+- ✅ Optional parameters only sent if explicitly provided (cleaner request payloads)
+- ✅ Backend `@JsonInclude(NON_NULL)` prevents null values in response
+- ✅ Backend defaults `filterObsWithOrders=true` if omitted
+- ✅ Mirrors existing GET endpoint behavior exactly (same BahmniObsService methods)
+
+**Optional Parameter Handling:**
+- **Frontend:** Only includes `scope`, `obsIgnoreList`, `filterObsWithOrders` in request if explicitly provided via `options` parameter
+- **Backend:** `@JsonInclude(NON_NULL)` annotation ensures null values are not serialized in JSON response
+- **Minimal Request:** Care instructions use case sends only `{ visitUuids, concept }` — optional params omitted by default
+- **Flexible Usage:** Future use cases can pass `{ scope: "latest", filterObsWithOrders: false }` to override defaults
 
 **Complexity/Risk**: Low-Medium
 
@@ -343,7 +468,7 @@ useEffect(() => {
 
 | Sub-task | Effort | Files | Tests |
 |----------|--------|-------|-------|
-| 1. Backend: controller + DTOs in openmrs-module-ipd | ~0.5 pts | `IPDCareInstructionsController.java`, `CareInstructionsBatchRequest.java`, `VisitObservationsResponse.java` | JUnit |
+| 1. Backend: POST /batch endpoint + DTOs in BahmniObservationsController | ~0.4 pts | `BahmniObservationsController.java` (modify), `BahmniObservationsBatchRequest.java` (new), `VisitObservationsResponse.java` (new) | JUnit |
 | 2. Frontend: batch utility + URL constant | ~0.2 pts | `CareInstructionsUtils.jsx`, `constants.js` | Unit tests |
 | 3. Frontend: fetch count map in CareViewPatientsSummary | ~0.3 pts | `CareViewPatientsSummary.jsx` | Unit tests |
 | 4. Frontend: render notification in PatientDetailsCell | ~0.3 pts | `PatientDetailsCell.jsx` | Unit tests |
