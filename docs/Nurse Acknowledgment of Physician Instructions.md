@@ -132,3 +132,36 @@ For detailed information about the Task API, including:
 - Backend and frontend changes required
 
 **See:** [tasks_api_discovery.md](./tasks_api_discovery.md)
+
+### **5.5 Flow: Create Order from Observation Form**
+
+```mermaid
+flowchart TD
+    A([Start: Open Observation Form]) --> B{Form Type?}
+
+%% --- Surgery Path ---
+    B -->|Surgery Required| C{Surgery Exists?}
+    C -->|No| D[User needs to Create Surgery in OT Module]
+    C -->|Yes| E[Select Existing Surgery using dropdown]
+
+    D --> E
+    E --> F["Fill Observation (linked to Surgery)"]
+    F --> G[Submit Observation]
+    G --> H[Auto-Create Surgery Order]
+    H --> I[Link Observation ↔ Surgery Order]
+
+%% --- Non-Surgery Path ---
+B -->|No Surgery Required| J["Fill Observation (no Surgery Fields)"]
+    J --> K[Submit Observation]
+    K --> L[Auto-Create General Order]
+    L --> M[Link Observation ↔ General Order]
+
+%% --- Common Outcome ---
+    I --> N[Display configured observation as Care Instruction]
+    M --> N
+    N --> O[Nurse can Create a non-medication Task]
+    O --> P[Assign Task with Order ID]
+    P --> Q([Task Ready for Execution])
+```
+
+This flow demonstrates how observations are automatically linked to orders (either surgery orders or general orders) and how these can be tracked as care instructions and assigned to nurses as executable tasks.
