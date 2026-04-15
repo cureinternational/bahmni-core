@@ -1,0 +1,35 @@
+flowchart TD
+
+%% -------- INITIAL STATE --------
+    A[Observation Submitted] --> B[Care Instruction Row Created]
+    B --> C[Shown in 'Not Acknowledged' Tab]
+
+%% -------- TASK CREATION --------
+    C --> D[Nurse Creates Task]
+    D --> E[Task Linked with Order ID]
+    E --> F[Move Row to 'Acknowledged' Tab]
+
+%% -------- UPDATE EVENT --------
+    F --> G{Observation Updated?}
+
+%% -------- NO UPDATE --------
+    G -->|No| H[No Change]
+
+%% -------- UPDATE FLOW --------
+    G -->|Yes| I["Care Instruction Updated\n(v1 → v2)"]
+
+    I --> J[Do NOT Modify Existing Task]
+    J --> K[Do NOT Recreate / Cancel Task]
+
+    K --> L["Trigger Visual Indicator\n(Blue Blink) in Care Instruction Row"]
+    L --> M["Nurse notices updated care instructions"]
+
+%% -------- OPTIONAL ACTION --------
+    M --> N["Nurse may decide to take action or not"]
+    N -->|Take Action| O["Create or Cancel Task if required"]
+    N -->|No Action| P["Continue with Existing Task"]
+
+%% -------- END --------
+    O --> T[Task Execution Continues]
+    P --> T
+    H --> T

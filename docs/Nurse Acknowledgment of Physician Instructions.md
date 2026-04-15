@@ -165,3 +165,13 @@ B -->|No Surgery Required| J["Fill Observation (no Surgery Fields)"]
 ```
 
 This flow demonstrates how observations are automatically linked to orders (either surgery orders or general orders) and how these can be tracked as care instructions and assigned to nurses as executable tasks.
+
+### **5.6 Care Instructions Lifecycle**
+
+**See:** [flowDiagram/careInstructionsLifecycle.mmd](./flowDiagram/careInstructionsLifecycle.mmd)
+
+This diagram shows the complete lifecycle of care instructions from creation through task execution, including:
+- Initial instruction display in "Not Acknowledged" tab
+- Task creation and acknowledgment workflow
+- Handling of updated observations with visual indicators
+- Optional nurse actions on instruction updates
