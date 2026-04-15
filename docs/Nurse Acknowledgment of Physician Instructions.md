@@ -142,7 +142,7 @@ flowchart TD
 %% --- Surgery Path ---
     B -->|Surgery Required| C{Surgery Exists?}
     C -->|No| D[User needs to Create Surgery in OT Module]
-    C -->|Yes| E[Select Existing Surgery using dropdown]
+    C -->|Yes| E[Select Existing active Surgery using dropdown]
 
     D --> E
     E --> F["Fill Observation (linked to Surgery)"]
