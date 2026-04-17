@@ -133,6 +133,31 @@ mvn test -Dtest=ServiceNameTest
 
 # Skip tests during build
 mvn install -DskipTests
+
+# Run without code coverage (JaCoCo) if experiencing memory issues
+mvn test -Djacoco.skip=true
+```
+
+### Testing Form Draft Services
+
+When testing `FormDraftService` or `FormDraftController`:
+- Use `TemporaryFolder` JUnit rule to set up a temporary directory for form data files
+- Set `OPENMRS_APPLICATION_DATA_DIRECTORY` system property in test setup
+- Mock `FormDraftDAO`, `PatientService`, `UserService`, and `EncounterService` dependencies
+- For controller tests, use reflection to inject mock service if no public setter is available
+- Test the `markedAsSaved` flag behavior to ensure draft lifecycle works correctly
+
+Example:
+```java
+@Rule
+public TemporaryFolder temporaryFolder = new TemporaryFolder();
+
+@Before
+public void setUp() {
+    System.setProperty("OPENMRS_APPLICATION_DATA_DIRECTORY",
+        temporaryFolder.getRoot().getAbsolutePath());
+    // Initialize service with mocks
+}
 ```
 
 ## Dependencies & Versions
@@ -188,12 +213,43 @@ Use `BahmniObsService` and related classes in `org.bahmni.module.bahmnicore.serv
 
 The `EncounterTransactionMapper` is central. It orchestrates conversion of encounters with all nested data (observations, orders, diagnoses) between the contract and entity layers.
 
+### Working with Form Drafts
+
+Form drafts enable auto-save functionality for forms. Key components:
+
+**Service**: `FormDraftService` (interface) and `FormDraftServiceImpl` (implementation) in `org.bahmni.module.bahmnicore.service`
+
+**Key Methods**:
+- `saveDraft(FormDraftRequest)`: Creates or updates a draft. Automatically creates a new draft if the existing one is marked as saved.
+- `getDraft(patientUuid, providerUuid)`: Retrieves the latest draft for a patient-provider pair.
+- `markDraftAsSaved(patientUuid, providerUuid)`: Marks a draft as saved (finalized), so subsequent saves create a new draft.
+- `discardDraft(patientUuid, providerUuid)`: Deletes the latest draft.
+- `getFormData(formDataPath)`: Retrieves the actual form data from disk.
+
+**REST Endpoints** (in `FormDraftController`):
+- `POST /rest/v1/bahmnicore/formdraft`: Save/auto-save a draft
+- `GET /rest/v1/bahmnicore/formdraft?patientUuid=xxx&providerUuid=yyy`: Retrieve draft (returns empty response if no draft exists)
+- `PATCH /rest/v1/bahmnicore/formdraft?patientUuid=xxx&providerUuid=yyy`: Mark draft as saved
+- `DELETE /rest/v1/bahmnicore/formdraft?patientUuid=xxx&providerUuid=yyy`: Discard draft
+
+**Data Model**: `FormDraft` entity with fields:
+- `uuid`: Unique identifier
+- `patient`: Reference to Patient
+- `user`: Reference to User (provider)
+- `encounter`: Optional reference to Encounter
+- `markedAsSaved`: Boolean flag indicating if draft is finalized
+- `formDataPath`: File path where form data is persisted
+- `dateCreated`, `dateChanged`: Timestamps
+- `creator`, `changedBy`: User references for audit
+
+**Form Data Persistence**: Form data is stored as JSON files in the `form_draft` subdirectory of `OPENMRS_APPLICATION_DATA_DIRECTORY`. Each draft has its own file named with its UUID.
+
 ## Git & Branch Strategy
 
 - **Main development branch**: `CURE-Product-Master`
 - **Feature branches**: Named after Hive/JIRA tickets (e.g., `draft-form`, `Hive-106849`)
 - **Pull requests**: Required for merging to master
-- Recent work: Draft forms, rules engine, disease summaries
+- Recent work: Draft forms (Hive-109060 - markAsSaved flag, GET endpoint response change), rules engine, disease summaries
 
 ## Code Style & Conventions
 
@@ -216,6 +272,15 @@ The `EncounterTransactionMapper` is central. It orchestrates conversion of encou
 5. **Rules Engine**: Rules engine (version 1.1.0-SNAPSHOT) is used for resolving specific versions and applying business rules. Check `rules-engine-repository` for resolver implementations.
 
 6. **Data Migration Mode**: `bahmnicore.datamigration.mode` property controls whether the system is in migration mode. Some logic behaves differently based on this flag.
+
+7. **Form Draft Lifecycle**: Form drafts follow a specific lifecycle:
+   - Initial save creates a new draft with `markedAsSaved=false`
+   - Subsequent saves update the existing draft (if not marked as saved)
+   - When `markDraftAsSaved` is called, the draft is finalized
+   - The next save after marking creates a new draft instead of updating the marked one
+   - This allows users to finalize a draft and then continue editing in a fresh draft
+
+8. **Form Data File Handling**: Form data is persisted to disk as JSON files. The `OPENMRS_APPLICATION_DATA_DIRECTORY` system property must be set for the service to function. Test code should set this property in `setUp()` using a `TemporaryFolder` rule.
 
 ## Debugging Tips
 
