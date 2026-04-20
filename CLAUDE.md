@@ -222,7 +222,7 @@ Form drafts enable auto-save functionality for forms. Key components:
 **Key Methods**:
 - `saveDraft(FormDraftRequest)`: Creates or updates a draft. Automatically creates a new draft if the existing one is marked as saved.
 - `getDraft(patientUuid, providerUuid)`: Retrieves the latest draft for a patient-provider pair.
-- `markDraftAsSaved(patientUuid, providerUuid)`: Marks a draft as saved (finalized), so subsequent saves create a new draft.
+- `markDraftAsSaved(patientUuid, providerUuid)`: Marks a draft as saved in the system. Once saved, subsequent saves create a new draft instead of updating the existing one.
 - `discardDraft(patientUuid, providerUuid)`: Deletes the latest draft.
 - `getFormData(formDataPath)`: Retrieves the actual form data from disk.
 
@@ -237,7 +237,7 @@ Form drafts enable auto-save functionality for forms. Key components:
 - `patient`: Reference to Patient
 - `user`: Reference to User (provider)
 - `encounter`: Optional reference to Encounter
-- `markedAsSaved`: Boolean flag indicating if draft is finalized
+- `markedAsSaved`: Boolean flag indicating if the draft is saved in the system and is no longer considered a draft
 - `formDataPath`: File path where form data is persisted
 - `dateCreated`, `dateChanged`: Timestamps
 - `creator`, `changedBy`: User references for audit
@@ -247,9 +247,9 @@ Form drafts enable auto-save functionality for forms. Key components:
 ## Git & Branch Strategy
 
 - **Main development branch**: `CURE-Product-Master`
-- **Feature branches**: Named after Hive/JIRA tickets (e.g., `draft-form`, `Hive-106849`)
+- **Feature branches**: Named after Hive/JIRA tickets (e.g., `draft-form`, `Hive-106849`)      
 - **Pull requests**: Required for merging to master
-- Recent work: Draft forms (Hive-109060 - markAsSaved flag, GET endpoint response change), rules engine, disease summaries
+- Recent work: Draft forms, rules engine, disease summaries
 
 ## Code Style & Conventions
 
@@ -276,9 +276,9 @@ Form drafts enable auto-save functionality for forms. Key components:
 7. **Form Draft Lifecycle**: Form drafts follow a specific lifecycle:
    - Initial save creates a new draft with `markedAsSaved=false`
    - Subsequent saves update the existing draft (if not marked as saved)
-   - When `markDraftAsSaved` is called, the draft is finalized
-   - The next save after marking creates a new draft instead of updating the marked one
-   - This allows users to finalize a draft and then continue editing in a fresh draft
+   - When `markDraftAsSaved` is called, the draft is saved in the system and is no longer treated as a draft
+   - The next save after marking creates a new draft instead of updating the saved one
+   - This enables users to start a fresh draft for new edits. 
 
 8. **Form Data File Handling**: Form data is persisted to disk as JSON files. The `OPENMRS_APPLICATION_DATA_DIRECTORY` system property must be set for the service to function. Test code should set this property in `setUp()` using a `TemporaryFolder` rule.
 
