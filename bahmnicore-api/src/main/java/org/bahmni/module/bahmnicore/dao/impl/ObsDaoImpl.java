@@ -317,6 +317,30 @@ public class ObsDaoImpl implements ObsDao {
         return queryToGetObs.list();
     }
 
+    @Override
+    public List<Obs> getFormBuilderObsForVisits(String patientUuid, List<Integer> visitIds) {
+        if (visitIds == null || visitIds.isEmpty()) return new ArrayList<>();
+
+        String hql = "SELECT DISTINCT obs FROM Obs obs " +
+                "JOIN FETCH obs.encounter enc " +
+                "JOIN FETCH enc.visit v " +
+                "JOIN FETCH obs.creator creator " +
+                "JOIN FETCH creator.names personName " +
+                "WHERE obs.person.uuid = :patientUuid " +
+                "  AND v.visitId IN (:visitIds) " +
+                "  AND obs.formFieldPath IS NOT NULL " +
+                "  AND obs.formFieldPath <> '' " +
+                "  AND obs.voided = false " +
+                "  AND enc.voided = false " +
+                "ORDER BY obs.obsDatetime DESC";
+
+        return sessionFactory.getCurrentSession()
+                .createQuery(hql, Obs.class)
+                .setParameter("patientUuid", patientUuid)
+                .setParameterList("visitIds", visitIds)
+                .list();
+    }
+
     private String commaSeparatedFormNamesPattern(List<String> formNames) {
         ArrayList<String> formPatterns = new ArrayList<>();
         formNames.forEach(form -> formPatterns.add("\\\\^" + form + "\\\\."));

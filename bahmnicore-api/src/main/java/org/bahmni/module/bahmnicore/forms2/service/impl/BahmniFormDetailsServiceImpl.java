@@ -1,5 +1,7 @@
 package org.bahmni.module.bahmnicore.forms2.service.impl;
 
+import org.bahmni.module.bahmnicore.dao.ObsDao;
+import org.bahmni.module.bahmnicore.dao.VisitDao;
 import org.bahmni.module.bahmnicore.forms2.contract.FormType;
 import org.bahmni.module.bahmnicore.forms2.contract.FormDetails;
 import org.bahmni.module.bahmnicore.forms2.service.BahmniFormDetailsService;
@@ -39,32 +41,50 @@ public class BahmniFormDetailsServiceImpl implements BahmniFormDetailsService {
     private final ObsService obsService;
     private BahmniVisitService bahmniVisitService;
     private BahmniProgramWorkflowService bahmniProgramWorkflowService;
+    private final VisitDao visitDao;
+    private final ObsDao obsDao;
 
     @Autowired
     public BahmniFormDetailsServiceImpl(PatientService patientService, VisitService visitService,
                                         EncounterService encounterService, ObsService obsService,
                                         BahmniVisitService bahmniVisitService,
-                                        BahmniProgramWorkflowService bahmniProgramWorkflowService) {
+                                        BahmniProgramWorkflowService bahmniProgramWorkflowService,
+                                        VisitDao visitDao, ObsDao obsDao) {
         this.visitService = visitService;
         this.patientService = patientService;
         this.encounterService = encounterService;
         this.obsService = obsService;
         this.bahmniVisitService = bahmniVisitService;
         this.bahmniProgramWorkflowService = bahmniProgramWorkflowService;
+        this.visitDao = visitDao;
+        this.obsDao = obsDao;
     }
 
     @Override
     public Collection<FormDetails> getFormDetails(String patientUuid, FormType formType, int numberOfVisits) {
+        if (FormType.FORMS2.equals(formType) || formType == null) {
+            // Optimized path: 2 DB queries instead of ~1500.
+            // visitDao.getVisitIdsFor issues a LIMIT-bounded query; avoids loading all visits into heap.
+            // obsDao.getFormBuilderObsForVisits filters by form_namespace_and_path at DB level
+            // and uses JOIN FETCH to eliminate N+1 lazy loads in FormDetailsMapper.
+            List<Integer> visitIds = visitDao.getVisitIdsFor(patientUuid,
+                    numberOfVisits > 0 ? numberOfVisits : null);
+            if (visitIds.isEmpty()) return Collections.emptyList();
+
+            List<Obs> formBuilderObs = obsDao.getFormBuilderObsForVisits(patientUuid, visitIds);
+            return createFormDetails(formBuilderObs, FormType.FORMS2);
+        }
+
+        // Legacy FORMS1 path (unchanged)
         Patient patient = getPatient(patientUuid);
         List<Visit> visits = visitService.getVisitsByPatient(patient);
 
         //Warning: This check is needed to avoid getEncounters returning ALL non-voided encounters of all patients leading to OutOfMemoryError:Java Heap
         //Refer: https://bahmni.atlassian.net/browse/BAH-3513
-        if(visits.isEmpty())
+        if (visits.isEmpty())
             return Collections.emptyList();
 
         List<Visit> limitedVisits = limitVisits(visits, numberOfVisits);
-
         List<Encounter> encounters = getEncounters(limitedVisits);
 
         if (isNotEmpty(encounters) && isNotEmpty(limitedVisits)) {
