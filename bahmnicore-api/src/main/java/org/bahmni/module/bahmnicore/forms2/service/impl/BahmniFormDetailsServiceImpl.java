@@ -25,8 +25,12 @@ import java.security.InvalidParameterException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.util.Collections.singletonList;
 import static org.apache.commons.collections.CollectionUtils.isNotEmpty;
@@ -63,28 +67,24 @@ public class BahmniFormDetailsServiceImpl implements BahmniFormDetailsService {
     @Override
     public Collection<FormDetails> getFormDetails(String patientUuid, FormType formType, int numberOfVisits) {
         if (FormType.FORMS2.equals(formType) || formType == null) {
-            // Optimized path: 2 DB queries instead of ~1500.
-            // visitDao.getVisitIdsFor issues a LIMIT-bounded query; avoids loading all visits into heap.
-            // obsDao.getFormBuilderObsForVisits filters by form_namespace_and_path at DB level
-            // and uses JOIN FETCH to eliminate N+1 lazy loads in FormDetailsMapper.
             List<Integer> visitIds = visitDao.getVisitIdsFor(patientUuid,
                     numberOfVisits > 0 ? numberOfVisits : null);
             if (visitIds.isEmpty()) return Collections.emptyList();
 
-            List<Obs> formBuilderObs = obsDao.getFormBuilderObsForVisits(patientUuid, visitIds);
-            return createFormDetails(formBuilderObs, FormType.FORMS2);
+            List<Object[]> rows = obsDao.getFormBuilderFormProjectionForVisits(patientUuid, visitIds);
+            return mapProjectionToFormDetails(rows);
         }
 
-        // Legacy FORMS1 path (unchanged)
         Patient patient = getPatient(patientUuid);
         List<Visit> visits = visitService.getVisitsByPatient(patient);
 
         //Warning: This check is needed to avoid getEncounters returning ALL non-voided encounters of all patients leading to OutOfMemoryError:Java Heap
         //Refer: https://bahmni.atlassian.net/browse/BAH-3513
-        if (visits.isEmpty())
+        if(visits.isEmpty())
             return Collections.emptyList();
 
         List<Visit> limitedVisits = limitVisits(visits, numberOfVisits);
+
         List<Encounter> encounters = getEncounters(limitedVisits);
 
         if (isNotEmpty(encounters) && isNotEmpty(limitedVisits)) {
@@ -137,6 +137,42 @@ public class BahmniFormDetailsServiceImpl implements BahmniFormDetailsService {
             return getFormDetails(patient, new ArrayList<>(encountersByPatientProgramUuid), formType);
         }
         return Collections.emptyList();
+    }
+
+    private Collection<FormDetails> mapProjectionToFormDetails(List<Object[]> rows) {
+        Map<FormDetails, FormDetails> formDetailsMap = new HashMap<>();
+        for (Object[] row : rows) {
+            String formFieldPath  = (String) row[0];
+            String encounterUuid  = (String) row[1];
+            Date encounterDt      = (Date)   row[2];
+            String visitUuid      = (String) row[3];
+            Date visitStartDt     = (Date)   row[4];
+            String providerUuid   = (String) row[5];
+            String givenName      = (String) row[6];
+            String middleName     = (String) row[7];
+            String familyName     = (String) row[8];
+
+            FormDetails fd = new FormDetails();
+            fd.setFormType(FormType.FORMS2.getType());
+            fd.setFormName(FormUtil.getFormNameFromFieldPath(formFieldPath));
+            fd.setFormVersion(FormUtil.getFormVersionFromFieldPath(formFieldPath));
+            fd.setEncounterUuid(encounterUuid);
+            fd.setEncounterDateTime(encounterDt);
+            fd.setVisitUuid(visitUuid);
+            fd.setVisitStartDateTime(visitStartDt);
+
+            String fullName = Stream.of(givenName, middleName, familyName)
+                    .filter(s -> s != null && !s.isEmpty())
+                    .collect(Collectors.joining(" "));
+
+            if (formDetailsMap.containsKey(fd)) {
+                formDetailsMap.get(fd).addProvider(fullName, providerUuid);
+            } else {
+                fd.addProvider(fullName, providerUuid);
+                formDetailsMap.put(fd, fd);
+            }
+        }
+        return formDetailsMap.keySet();
     }
 
     private List<Visit> limitVisits(List<Visit> visits, int numberOfVisits) {

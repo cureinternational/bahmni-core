@@ -19,6 +19,8 @@ import org.openmrs.util.LocaleUtility;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -321,24 +323,87 @@ public class ObsDaoImpl implements ObsDao {
     public List<Obs> getFormBuilderObsForVisits(String patientUuid, List<Integer> visitIds) {
         if (visitIds == null || visitIds.isEmpty()) return new ArrayList<>();
 
-        String hql = "SELECT DISTINCT obs FROM Obs obs " +
-                "JOIN FETCH obs.encounter enc " +
-                "JOIN FETCH enc.visit v " +
-                "JOIN FETCH obs.creator creator " +
-                "JOIN FETCH creator.names personName " +
-                "WHERE obs.person.uuid = :patientUuid " +
-                "  AND v.visitId IN (:visitIds) " +
-                "  AND obs.formFieldPath IS NOT NULL " +
-                "  AND obs.formFieldPath <> '' " +
-                "  AND obs.voided = false " +
-                "  AND enc.voided = false " +
-                "ORDER BY obs.obsDatetime DESC";
+        String sql = "SELECT DISTINCT o.* " +
+                "FROM obs o " +
+                "JOIN encounter e ON e.encounter_id = o.encounter_id AND e.voided = 0 " +
+                "JOIN visit v ON v.visit_id = e.visit_id " +
+                "JOIN person per ON per.person_id = o.person_id " +
+                "WHERE per.uuid = :patientUuid " +
+                "  AND v.visit_id IN (:visitIds) " +
+                "  AND o.form_namespace_and_path IS NOT NULL " +
+                "  AND o.form_namespace_and_path <> '' " +
+                "  AND o.voided = 0 " +
+                "ORDER BY o.obs_datetime DESC";
 
         return sessionFactory.getCurrentSession()
-                .createQuery(hql, Obs.class)
+                .createSQLQuery(sql)
+                .addEntity(Obs.class)
                 .setParameter("patientUuid", patientUuid)
                 .setParameterList("visitIds", visitIds)
                 .list();
+    }
+
+    @Override
+    public List<Object[]> getFormBuilderFormProjectionForVisits(String patientUuid, List<Integer> visitIds) {
+        if (visitIds == null || visitIds.isEmpty()) return new ArrayList<>();
+
+        // visitIds are integer PKs returned by a prior parameterised HQL query — safe to inline.
+        // Using doWork() + raw JDBC because Hibernate 5.x setParameterList() cannot expand
+        // a named parameter that appears inside a derived-table subquery (FROM clause subquery);
+        // the SQL is sent to MySQL with the literal ':visitIds' text, causing it to stall
+        // indefinitely and hit the 60-second proxy timeout.
+        //
+        // Query shape: encounter (visit_id IN filter, idx used) → obs (encounter_id idx)
+        // GROUP BY collapses N obs rows per form to 1 row per (encounter, FormName.version)
+        // entirely inside MySQL — only ~10-50 rows are returned to the JVM.
+        final String inClause = StringUtils.join(visitIds, ",");
+        final String sql =
+                "SELECT " +
+                "  SUBSTRING_INDEX(MIN(o.form_namespace_and_path), '^', -1), " +
+                "  e.uuid, " +
+                "  e.encounter_datetime, " +
+                "  v.uuid, " +
+                "  v.date_started, " +
+                "  MIN(u.uuid), " +
+                "  MIN(pn.given_name), " +
+                "  MIN(pn.middle_name), " +
+                "  MIN(pn.family_name) " +
+                "FROM encounter e " +
+                "JOIN visit v        ON v.visit_id = e.visit_id " +
+                "                    AND v.visit_id IN (" + inClause + ") " +
+                "JOIN obs o          ON o.encounter_id = e.encounter_id " +
+                "                    AND o.voided = 0 " +
+                "                    AND o.form_namespace_and_path IS NOT NULL " +
+                "                    AND o.form_namespace_and_path <> '' " +
+                "JOIN users u        ON u.user_id = o.creator " +
+                "JOIN person_name pn ON pn.person_id = u.person_id AND pn.voided = 0 " +
+                "WHERE e.voided = 0 " +
+                "GROUP BY " +
+                "  o.encounter_id, " +
+                "  SUBSTRING_INDEX(SUBSTRING_INDEX(o.form_namespace_and_path, '^', -1), '/', 1), " +
+                "  e.uuid, e.encounter_datetime, v.uuid, v.date_started " +
+                "ORDER BY e.encounter_datetime DESC";
+
+        final List<Object[]> results = new ArrayList<>();
+        sessionFactory.getCurrentSession().doWork(connection -> {
+            try (Statement stmt = connection.createStatement();
+                 ResultSet rs = stmt.executeQuery(sql)) {
+                while (rs.next()) {
+                    results.add(new Object[]{
+                            rs.getString(1),
+                            rs.getString(2),
+                            rs.getTimestamp(3),
+                            rs.getString(4),
+                            rs.getTimestamp(5),
+                            rs.getString(6),
+                            rs.getString(7),
+                            rs.getString(8),
+                            rs.getString(9)
+                    });
+                }
+            }
+        });
+        return results;
     }
 
     private String commaSeparatedFormNamesPattern(List<String> formNames) {
