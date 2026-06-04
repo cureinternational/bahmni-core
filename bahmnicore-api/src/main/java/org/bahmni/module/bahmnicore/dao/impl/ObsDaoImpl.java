@@ -347,15 +347,6 @@ public class ObsDaoImpl implements ObsDao {
     public List<Object[]> getFormBuilderFormProjectionForVisits(String patientUuid, List<Integer> visitIds) {
         if (visitIds == null || visitIds.isEmpty()) return new ArrayList<>();
 
-        // visitIds are integer PKs returned by a prior parameterised HQL query — safe to inline.
-        // Using doWork() + raw JDBC because Hibernate 5.x setParameterList() cannot expand
-        // a named parameter that appears inside a derived-table subquery (FROM clause subquery);
-        // the SQL is sent to MySQL with the literal ':visitIds' text, causing it to stall
-        // indefinitely and hit the 60-second proxy timeout.
-        //
-        // Query shape: encounter (visit_id IN filter, idx used) → obs (encounter_id idx)
-        // GROUP BY collapses N obs rows per form to 1 row per (encounter, FormName.version)
-        // entirely inside MySQL — only ~10-50 rows are returned to the JVM.
         final String inClause = StringUtils.join(visitIds, ",");
         final String sql =
                 "SELECT " +
