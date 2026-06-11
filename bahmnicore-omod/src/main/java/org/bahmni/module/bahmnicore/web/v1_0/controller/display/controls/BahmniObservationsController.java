@@ -32,9 +32,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -135,13 +137,30 @@ public class BahmniObservationsController extends BaseRestController {
                                              @RequestParam(value = "filterObsWithOrders", required = false, defaultValue = "true") Boolean filterObsWithOrders) {
 
         Visit visit = visitService.getVisitByUuid(visitUuid);
+        Collection<BahmniObservation> observations;
         if (ObjectUtils.equals(scope, INITIAL)) {
-            return bahmniObsService.getInitialObsByVisit(visit, MiscUtils.getConceptsForNames(conceptNames, conceptService), obsIgnoreList, filterObsWithOrders);
+            observations = bahmniObsService.getInitialObsByVisit(visit, MiscUtils.getConceptsForNames(conceptNames, conceptService), obsIgnoreList, filterObsWithOrders);
         } else if (ObjectUtils.equals(scope, LATEST)) {
-            return bahmniObsService.getLatestObsByVisit(visit, MiscUtils.getConceptsForNames(conceptNames, conceptService), obsIgnoreList, filterObsWithOrders);
+            observations = bahmniObsService.getLatestObsByVisit(visit, MiscUtils.getConceptsForNames(conceptNames, conceptService), obsIgnoreList, filterObsWithOrders);
         } else {
-            // Sending conceptName and obsIgnorelist, kinda contradicts, since we filter directly on concept names (not on root concept)
-            return bahmniObsService.getObservationForVisit(visitUuid, conceptNames, MiscUtils.getConceptsForNames(obsIgnoreList, conceptService), filterObsWithOrders, null);
+            observations = bahmniObsService.getObservationForVisit(visitUuid, conceptNames, MiscUtils.getConceptsForNames(obsIgnoreList, conceptService), filterObsWithOrders, null);
+        }
+        linkPreviousVersions(observations);
+        return observations;
+    }
+
+    private void linkPreviousVersions(Collection<BahmniObservation> observations) {
+        if (observations == null || observations.size() < 2) return;
+        Map<String, List<BahmniObservation>> grouped = observations.stream()
+                .filter(obs -> obs.getFormFieldPath() != null && !obs.getFormFieldPath().isEmpty())
+                .collect(Collectors.groupingBy(BahmniObservation::getFormFieldPath));
+        for (List<BahmniObservation> group : grouped.values()) {
+            if (group.size() < 2) continue;
+            group.sort(Comparator.comparing(BahmniObservation::getEncounterDateTime,
+                    Comparator.nullsFirst(Comparator.naturalOrder())));
+            for (int i = 1; i < group.size(); i++) {
+                group.get(i).setPreviousVersionUuid(group.get(i - 1).getUuid());
+            }
         }
     }
 
