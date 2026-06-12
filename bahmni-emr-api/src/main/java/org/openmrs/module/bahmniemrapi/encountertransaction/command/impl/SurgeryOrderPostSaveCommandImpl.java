@@ -13,14 +13,11 @@ import org.openmrs.api.ProviderService;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.bahmniemrapi.encountertransaction.command.EncounterDataPostSaveCommand;
 import org.openmrs.module.bahmniemrapi.encountertransaction.contract.BahmniEncounterTransaction;
-import org.openmrs.module.bahmniemrapi.encountertransaction.contract.BahmniObservation;
 import org.openmrs.module.emrapi.encounter.domain.EncounterTransaction;
 import org.openmrs.module.operationtheater.api.model.SurgicalAppointment;
 import org.openmrs.module.operationtheater.api.service.SurgicalAppointmentService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-
-import java.util.Collection;
 
 @Component
 public class SurgeryOrderPostSaveCommandImpl implements EncounterDataPostSaveCommand {
@@ -46,17 +43,18 @@ public class SurgeryOrderPostSaveCommandImpl implements EncounterDataPostSaveCom
     @Override
     public EncounterTransaction save(BahmniEncounterTransaction bahmniEncounterTransaction, Encounter currentEncounter,
             EncounterTransaction updatedEncounterTransaction) {
+        String surgicalApptUuid = findSurgicalAppointmentUuidFromNewObs(currentEncounter);
 
-        String surgicalApptUuid = findSurgicalAppointmentUuid(bahmniEncounterTransaction.getObservations());
-        String requiredOrderType = surgicalApptUuid != null ? SURGERY_ORDER_TYPE_NAME : GENERAL_ORDER_TYPE_NAME;
-
-        Order existingOrder = findOrderByType(currentEncounter, requiredOrderType);
+        Order existingOrder = surgicalApptUuid != null
+                ? findExistingOrderForSurgicalAppointment(surgicalApptUuid)
+                : findOrderByType(currentEncounter, GENERAL_ORDER_TYPE_NAME);
 
         if (existingOrder != null) {
             linkUnlinkedObsToOrder(existingOrder, currentEncounter);
             return updatedEncounterTransaction;
         }
 
+        String requiredOrderType = surgicalApptUuid != null ? SURGERY_ORDER_TYPE_NAME : GENERAL_ORDER_TYPE_NAME;
         Order newOrder = createOrder(requiredOrderType, currentEncounter);
         if (newOrder == null) {
             return updatedEncounterTransaction;
@@ -68,27 +66,26 @@ public class SurgeryOrderPostSaveCommandImpl implements EncounterDataPostSaveCom
         return updatedEncounterTransaction;
     }
 
-    private String findSurgicalAppointmentUuid(Collection<BahmniObservation> observations) {
-        if (observations == null) {
-            return null;
-        }
-        for (BahmniObservation obs : observations) {
-            if (isSelectSurgeryObs(obs)) {
-                return (String) obs.getValue();
-            }
-            String found = findSurgicalAppointmentUuid(obs.getGroupMembers());
-            if (found != null) {
-                return found;
+    private String findSurgicalAppointmentUuidFromNewObs(Encounter encounter) {
+        for (org.openmrs.Obs obs : encounter.getObs()) {
+            if (!obs.getVoided() && obs.getOrder() == null
+                    && obs.getConcept() != null
+                    && obs.getConcept().getName() != null
+                    && SELECT_SURGERY_CONCEPT_NAME.equals(obs.getConcept().getName().getName())
+                    && StringUtils.isNotBlank(obs.getValueComplex())) {
+                return obs.getValueComplex();
             }
         }
         return null;
     }
 
-    private boolean isSelectSurgeryObs(BahmniObservation obs) {
-        return obs.getConcept() != null
-                && SELECT_SURGERY_CONCEPT_NAME.equals(obs.getConcept().getName())
-                && obs.getValue() instanceof String
-                && StringUtils.isNotBlank((String) obs.getValue());
+    private Order findExistingOrderForSurgicalAppointment(String surgicalApptUuid) {
+        SurgicalAppointmentService svc = Context.getService(SurgicalAppointmentService.class);
+        SurgicalAppointment appt = svc.getSurgicalAppointmentByUuid(surgicalApptUuid);
+        if (appt != null && appt.getOrder() != null && !appt.getOrder().getVoided()) {
+            return appt.getOrder();
+        }
+        return null;
     }
 
     private Order findOrderByType(Encounter encounter, String orderTypeName) {
@@ -133,10 +130,9 @@ public class SurgeryOrderPostSaveCommandImpl implements EncounterDataPostSaveCom
         return null;
     }
 
-    // HQL bulk update bypasses ImmutableEntityInterceptor (same pattern as BahmniObsDaoImpl.updateObsMember).
     private void linkAllObsToOrder(Order order, Encounter encounter) {
         sessionFactory.getCurrentSession()
-                .createQuery("UPDATE Obs o SET o.order = :order WHERE o.encounter = :encounter AND o.voided = false")
+                .createQuery("UPDATE Obs o SET o.order = :order WHERE o.encounter = :encounter AND o.voided = false AND o.order IS NULL")
                 .setParameter("order", order)
                 .setParameter("encounter", encounter)
                 .executeUpdate();
