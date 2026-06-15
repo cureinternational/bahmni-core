@@ -1,7 +1,9 @@
 package org.openmrs.module.bahmniemrapi.encountertransaction.command.impl;
 
 import org.apache.commons.lang3.StringUtils;
-import org.hibernate.SessionFactory;
+import org.openmrs.module.bahmniemrapi.dao.SurgeryObsOrderLinkDao;
+import org.openmrs.CareSetting;
+import org.openmrs.Concept;
 import org.openmrs.Encounter;
 import org.openmrs.EncounterProvider;
 import org.openmrs.Order;
@@ -9,7 +11,6 @@ import org.openmrs.OrderType;
 import org.openmrs.Provider;
 import org.openmrs.api.ConceptService;
 import org.openmrs.api.OrderService;
-import org.openmrs.api.ProviderService;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.bahmniemrapi.encountertransaction.command.EncounterDataPostSaveCommand;
 import org.openmrs.module.bahmniemrapi.encountertransaction.contract.BahmniEncounterTransaction;
@@ -28,16 +29,14 @@ public class SurgeryOrderPostSaveCommandImpl implements EncounterDataPostSaveCom
 
     private final OrderService orderService;
     private final ConceptService conceptService;
-    private final ProviderService providerService;
-    private final SessionFactory sessionFactory;
+    private final SurgeryObsOrderLinkDao surgeryObsOrderLinkDao;
 
     @Autowired
     public SurgeryOrderPostSaveCommandImpl(OrderService orderService, ConceptService conceptService,
-            ProviderService providerService, SessionFactory sessionFactory) {
+            SurgeryObsOrderLinkDao surgeryObsOrderLinkDao) {
         this.orderService = orderService;
         this.conceptService = conceptService;
-        this.providerService = providerService;
-        this.sessionFactory = sessionFactory;
+        this.surgeryObsOrderLinkDao = surgeryObsOrderLinkDao;
     }
 
     @Override
@@ -50,7 +49,7 @@ public class SurgeryOrderPostSaveCommandImpl implements EncounterDataPostSaveCom
                 : findOrderByType(currentEncounter, GENERAL_ORDER_TYPE_NAME);
 
         if (existingOrder != null) {
-            linkUnlinkedObsToOrder(existingOrder, currentEncounter);
+            surgeryObsOrderLinkDao.assignOrderToUnlinkedObs(existingOrder, currentEncounter);
             return updatedEncounterTransaction;
         }
 
@@ -60,7 +59,7 @@ public class SurgeryOrderPostSaveCommandImpl implements EncounterDataPostSaveCom
             return updatedEncounterTransaction;
         }
 
-        linkAllObsToOrder(newOrder, currentEncounter);
+        surgeryObsOrderLinkDao.assignOrderToUnlinkedObs(newOrder, currentEncounter);
         linkSurgicalAppointmentToOrder(surgicalApptUuid, newOrder);
 
         return updatedEncounterTransaction;
@@ -109,12 +108,25 @@ public class SurgeryOrderPostSaveCommandImpl implements EncounterDataPostSaveCom
             return null;
         }
 
+        // Fix 1: null guard on concept
+        Concept concept = conceptService.getConceptByName(SELECT_SURGERY_CONCEPT_NAME);
+        if (concept == null) {
+            return null;
+        }
+
+        // Fix 3: null guard on careSetting + use enum constant
+        CareSetting careSetting = orderService.getCareSettingByName(
+                CareSetting.CareSettingType.OUTPATIENT.toString());
+        if (careSetting == null) {
+            return null;
+        }
+
         Order order = new Order();
         order.setPatient(encounter.getPatient());
         order.setEncounter(encounter);
         order.setOrderType(orderType);
-        order.setConcept(conceptService.getConceptByName(SELECT_SURGERY_CONCEPT_NAME));
-        order.setCareSetting(orderService.getCareSettingByName("OUTPATIENT"));
+        order.setConcept(concept);
+        order.setCareSetting(careSetting);
         order.setOrderer(provider);
         order.setDateActivated(encounter.getEncounterDatetime());
 
@@ -128,22 +140,6 @@ public class SurgeryOrderPostSaveCommandImpl implements EncounterDataPostSaveCom
             }
         }
         return null;
-    }
-
-    private void linkAllObsToOrder(Order order, Encounter encounter) {
-        sessionFactory.getCurrentSession()
-                .createQuery("UPDATE Obs o SET o.order = :order WHERE o.encounter = :encounter AND o.voided = false AND o.order IS NULL")
-                .setParameter("order", order)
-                .setParameter("encounter", encounter)
-                .executeUpdate();
-    }
-
-    private void linkUnlinkedObsToOrder(Order order, Encounter encounter) {
-        sessionFactory.getCurrentSession()
-                .createQuery("UPDATE Obs o SET o.order = :order WHERE o.encounter = :encounter AND o.voided = false AND o.order IS NULL")
-                .setParameter("order", order)
-                .setParameter("encounter", encounter)
-                .executeUpdate();
     }
 
     private void linkSurgicalAppointmentToOrder(String surgicalApptUuid, Order order) {

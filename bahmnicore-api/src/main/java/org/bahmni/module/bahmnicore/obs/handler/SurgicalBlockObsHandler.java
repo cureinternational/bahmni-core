@@ -14,7 +14,7 @@ public class SurgicalBlockObsHandler extends AbstractHandler implements ComplexO
 
     public static final Log log = LogFactory.getLog(SurgicalBlockObsHandler.class);
 
-    private static final String[] SUPPORTED_VIEWS = new String[] {
+    private static final String[] supportedViews = new String[] {
             ComplexObsHandler.RAW_VIEW, ComplexObsHandler.URI_VIEW,
             ComplexObsHandler.HTML_VIEW, ComplexObsHandler.TEXT_VIEW };
 
@@ -41,6 +41,6 @@ public class SurgicalBlockObsHandler extends AbstractHandler implements ComplexO
 
     @Override
     public String[] getSupportedViews() {
-        return SUPPORTED_VIEWS;
+        return supportedViews;
     }
 }

@@ -1,8 +1,6 @@
 package org.openmrs.module.bahmniemrapi.encountertransaction.command.impl;
 
-import org.hibernate.Session;
-import org.hibernate.SessionFactory;
-import org.hibernate.query.Query;
+import org.openmrs.module.bahmniemrapi.dao.SurgeryObsOrderLinkDao;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -18,7 +16,6 @@ import org.openmrs.OrderType;
 import org.openmrs.Provider;
 import org.openmrs.api.ConceptService;
 import org.openmrs.api.OrderService;
-import org.openmrs.api.ProviderService;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.bahmniemrapi.encountertransaction.contract.BahmniEncounterTransaction;
 import org.openmrs.module.emrapi.encounter.domain.EncounterTransaction;
@@ -49,10 +46,7 @@ public class SurgeryOrderPostSaveCommandImplTest {
 
     @Mock private OrderService orderService;
     @Mock private ConceptService conceptService;
-    @Mock private ProviderService providerService;
-    @Mock private SessionFactory sessionFactory;
-    @Mock private Session session;
-    @Mock private Query query;
+    @Mock private SurgeryObsOrderLinkDao surgeryObsOrderLinkDao;
     @Mock private SurgicalAppointmentService surgicalAppointmentService;
 
     private SurgeryOrderPostSaveCommandImpl command;
@@ -62,12 +56,7 @@ public class SurgeryOrderPostSaveCommandImplTest {
         initMocks(this);
         mockStatic(OpenmrsUtil.class);
         mockStatic(Context.class);
-        command = new SurgeryOrderPostSaveCommandImpl(orderService, conceptService, providerService, sessionFactory);
-
-        when(sessionFactory.getCurrentSession()).thenReturn(session);
-        when(session.createQuery(anyString())).thenReturn(query);
-        when(query.setParameter(anyString(), any())).thenReturn(query);
-        when(query.executeUpdate()).thenReturn(1);
+        command = new SurgeryOrderPostSaveCommandImpl(orderService, conceptService, surgeryObsOrderLinkDao);
     }
 
     @Test
@@ -92,7 +81,7 @@ public class SurgeryOrderPostSaveCommandImplTest {
 
         verify(orderService).getOrderTypeByName("Surgery Order");
         verify(orderService).saveOrder(any(Order.class), eq(null));
-        verify(query).executeUpdate();
+        verify(surgeryObsOrderLinkDao).assignOrderToUnlinkedObs(any(Order.class), any(Encounter.class));
         verify(surgicalAppointmentService).save(appt);
     }
 
@@ -156,7 +145,7 @@ public class SurgeryOrderPostSaveCommandImplTest {
         command.save(bet, encounter, new EncounterTransaction());
 
         verify(orderService, never()).saveOrder(any(Order.class), any());
-        verify(query).executeUpdate();
+        verify(surgeryObsOrderLinkDao).assignOrderToUnlinkedObs(any(Order.class), any(Encounter.class));
     }
 
     @Test
@@ -201,7 +190,7 @@ public class SurgeryOrderPostSaveCommandImplTest {
         command.save(bet, encounter, new EncounterTransaction());
 
         verify(orderService, never()).saveOrder(any(Order.class), any());
-        verify(query).executeUpdate();
+        verify(surgeryObsOrderLinkDao).assignOrderToUnlinkedObs(any(Order.class), any(Encounter.class));
     }
 
     @Test
@@ -238,7 +227,7 @@ public class SurgeryOrderPostSaveCommandImplTest {
         command.save(bet, encounterWithProvider(), new EncounterTransaction());
 
         verify(orderService, never()).saveOrder(any(Order.class), any());
-        verify(query, never()).executeUpdate();
+        verify(surgeryObsOrderLinkDao, never()).assignOrderToUnlinkedObs(any(Order.class), any(Encounter.class));
     }
 
     @Test
@@ -263,6 +252,48 @@ public class SurgeryOrderPostSaveCommandImplTest {
         verify(orderService).getOrderTypeByName("Surgery Order");
         // Called twice: once to check for existing order, once to link the appointment to the new order
         verify(surgicalAppointmentService, org.mockito.Mockito.times(2)).getSurgicalAppointmentByUuid("nested-appt-uuid");
+    }
+
+    @Test
+    public void shouldNotCreateOrderWhenNoProviderOnEncounter() {
+        BahmniEncounterTransaction bet = new BahmniEncounterTransaction();
+        bet.setObservations(new ArrayList<>());
+
+        when(orderService.getOrderTypeByName(anyString())).thenReturn(orderTypeWithName("General Order"));
+        when(conceptService.getConceptByName("Select Surgery")).thenReturn(new Concept());
+        when(orderService.getCareSettingByName(anyString())).thenReturn(new CareSetting());
+
+        Encounter encounter = new Encounter();
+        encounter.setOrders(new HashSet<>());
+        encounter.setEncounterProviders(Collections.emptySet());
+
+        command.save(bet, encounter, new EncounterTransaction());
+
+        verify(orderService, never()).saveOrder(any(Order.class), any());
+        verify(surgeryObsOrderLinkDao, never()).assignOrderToUnlinkedObs(any(Order.class), any(Encounter.class));
+    }
+
+    @Test
+    public void shouldNotSaveSurgicalAppointmentWhenNotFoundByUuid() {
+        BahmniEncounterTransaction bet = new BahmniEncounterTransaction();
+        bet.setObservations(new ArrayList<>());
+
+        OrderType surgeryType = orderTypeWithName("Surgery Order");
+        when(orderService.getOrderTypeByName("Surgery Order")).thenReturn(surgeryType);
+        when(orderService.saveOrder(any(Order.class), eq(null))).thenReturn(new Order());
+        when(orderService.getCareSettingByName(anyString())).thenReturn(new CareSetting());
+        when(conceptService.getConceptByName("Select Surgery")).thenReturn(new Concept());
+
+        PowerMockito.when(Context.getService(SurgicalAppointmentService.class)).thenReturn(surgicalAppointmentService);
+        when(surgicalAppointmentService.getSurgicalAppointmentByUuid("appt-uuid-123")).thenReturn(null);
+
+        Encounter encounter = encounterWithProvider();
+        encounter.addObs(selectSurgeryObs("appt-uuid-123"));
+
+        command.save(bet, encounter, new EncounterTransaction());
+
+        verify(orderService).saveOrder(any(Order.class), eq(null));
+        verify(surgicalAppointmentService, never()).save(any());
     }
 
     // --- helpers ---
