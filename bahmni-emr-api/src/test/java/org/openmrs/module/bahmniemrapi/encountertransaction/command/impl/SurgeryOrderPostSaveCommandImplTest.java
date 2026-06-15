@@ -52,6 +52,7 @@ public class SurgeryOrderPostSaveCommandImplTest {
     @Mock private SurgicalAppointmentService surgicalAppointmentService;
 
     private SurgeryOrderPostSaveCommandImpl command;
+    private Concept selectSurgeryConcept;
 
     @Before
     public void setUp() {
@@ -59,10 +60,17 @@ public class SurgeryOrderPostSaveCommandImplTest {
         mockStatic(OpenmrsUtil.class);
         mockStatic(Context.class);
         command = new SurgeryOrderPostSaveCommandImpl(orderService, conceptService, surgeryObsOrderLinkDao, adminService);
+
+        // GP returns blank → falls back to name lookup
         when(adminService.getGlobalProperty(
-            SurgeryOrderPostSaveCommandImpl.SURGERY_SELECTION_CONCEPT_GP,
-            SurgeryOrderPostSaveCommandImpl.SURGERY_SELECTION_CONCEPT_DEFAULT))
-            .thenReturn("Select Surgery");
+            SurgeryOrderPostSaveCommandImpl.SURGERY_SELECTION_CONCEPT_UUID_GP, ""))
+            .thenReturn("");
+
+        // Shared concept instance — obs detection and order creation both use this
+        selectSurgeryConcept = PowerMockito.mock(Concept.class);
+        when(conceptService.getConceptByName(
+            SurgeryOrderPostSaveCommandImpl.SURGERY_SELECTION_CONCEPT_DEFAULT_NAME))
+            .thenReturn(selectSurgeryConcept);
     }
 
     @Test
@@ -74,7 +82,7 @@ public class SurgeryOrderPostSaveCommandImplTest {
         when(orderService.getOrderTypeByName("Surgery Order")).thenReturn(surgeryOrderType);
         when(orderService.saveOrder(any(Order.class), eq(null))).thenReturn(new Order());
         when(orderService.getCareSettingByName("OUTPATIENT")).thenReturn(new CareSetting());
-        when(conceptService.getConceptByName("Select Surgery")).thenReturn(new Concept());
+        
 
         SurgicalAppointment appt = new SurgicalAppointment();
         PowerMockito.when(Context.getService(SurgicalAppointmentService.class)).thenReturn(surgicalAppointmentService);
@@ -99,7 +107,7 @@ public class SurgeryOrderPostSaveCommandImplTest {
         when(orderService.getOrderTypeByName("General Order")).thenReturn(orderTypeWithName("General Order"));
         when(orderService.saveOrder(any(Order.class), eq(null))).thenReturn(new Order());
         when(orderService.getCareSettingByName("OUTPATIENT")).thenReturn(new CareSetting());
-        when(conceptService.getConceptByName("Select Surgery")).thenReturn(new Concept());
+        
 
         command.save(bet, encounterWithProvider(), new EncounterTransaction());
 
@@ -118,7 +126,7 @@ public class SurgeryOrderPostSaveCommandImplTest {
         when(orderService.getOrderTypeByName("General Order")).thenReturn(orderTypeWithName("General Order"));
         when(orderService.saveOrder(any(Order.class), eq(null))).thenReturn(new Order());
         when(orderService.getCareSettingByName("OUTPATIENT")).thenReturn(new CareSetting());
-        when(conceptService.getConceptByName("Select Surgery")).thenReturn(new Concept());
+        
 
         Encounter encounter = encounterWithProvider();
         // "Select Surgery" obs from Form 1 already has an order — should be ignored
@@ -170,7 +178,7 @@ public class SurgeryOrderPostSaveCommandImplTest {
         when(orderService.getOrderTypeByName("Surgery Order")).thenReturn(orderTypeWithName("Surgery Order"));
         when(orderService.saveOrder(any(Order.class), eq(null))).thenReturn(new Order());
         when(orderService.getCareSettingByName("OUTPATIENT")).thenReturn(new CareSetting());
-        when(conceptService.getConceptByName("Select Surgery")).thenReturn(new Concept());
+        
 
         Encounter encounter = encounterWithProvider();
         // Surgery A order already on encounter
@@ -212,7 +220,7 @@ public class SurgeryOrderPostSaveCommandImplTest {
         when(orderService.getOrderTypeByName("Surgery Order")).thenReturn(surgeryType);
         when(orderService.saveOrder(any(Order.class), eq(null))).thenReturn(new Order());
         when(orderService.getCareSettingByName("OUTPATIENT")).thenReturn(new CareSetting());
-        when(conceptService.getConceptByName("Select Surgery")).thenReturn(new Concept());
+        
 
         SurgicalAppointment appt = new SurgicalAppointment();
         PowerMockito.when(Context.getService(SurgicalAppointmentService.class)).thenReturn(surgicalAppointmentService);
@@ -244,7 +252,7 @@ public class SurgeryOrderPostSaveCommandImplTest {
         when(orderService.getOrderTypeByName("Surgery Order")).thenReturn(orderTypeWithName("Surgery Order"));
         when(orderService.saveOrder(any(Order.class), eq(null))).thenReturn(new Order());
         when(orderService.getCareSettingByName("OUTPATIENT")).thenReturn(new CareSetting());
-        when(conceptService.getConceptByName("Select Surgery")).thenReturn(new Concept());
+        
 
         PowerMockito.when(Context.getService(SurgicalAppointmentService.class)).thenReturn(surgicalAppointmentService);
         when(surgicalAppointmentService.getSurgicalAppointmentByUuid("nested-appt-uuid"))
@@ -266,7 +274,7 @@ public class SurgeryOrderPostSaveCommandImplTest {
         bet.setObservations(new ArrayList<>());
 
         when(orderService.getOrderTypeByName(anyString())).thenReturn(orderTypeWithName("General Order"));
-        when(conceptService.getConceptByName("Select Surgery")).thenReturn(new Concept());
+        
         when(orderService.getCareSettingByName(anyString())).thenReturn(new CareSetting());
 
         Encounter encounter = new Encounter();
@@ -288,7 +296,7 @@ public class SurgeryOrderPostSaveCommandImplTest {
         when(orderService.getOrderTypeByName("Surgery Order")).thenReturn(surgeryType);
         when(orderService.saveOrder(any(Order.class), eq(null))).thenReturn(new Order());
         when(orderService.getCareSettingByName(anyString())).thenReturn(new CareSetting());
-        when(conceptService.getConceptByName("Select Surgery")).thenReturn(new Concept());
+        
 
         PowerMockito.when(Context.getService(SurgicalAppointmentService.class)).thenReturn(surgicalAppointmentService);
         when(surgicalAppointmentService.getSurgicalAppointmentByUuid("appt-uuid-123")).thenReturn(null);
@@ -305,14 +313,8 @@ public class SurgeryOrderPostSaveCommandImplTest {
     // --- helpers ---
 
     private Obs selectSurgeryObs(String apptUuid) {
-        ConceptName conceptName = new ConceptName();
-        conceptName.setName("Select Surgery");
-
-        Concept concept = PowerMockito.mock(Concept.class);
-        when(concept.getName()).thenReturn(conceptName);
-
         Obs obs = new Obs();
-        obs.setConcept(concept);
+        obs.setConcept(selectSurgeryConcept);
         obs.setValueComplex(apptUuid);
         obs.setVoided(false);
         return obs;

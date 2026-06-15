@@ -27,8 +27,8 @@ public class SurgeryOrderPostSaveCommandImpl implements EncounterDataPostSaveCom
 
     static final String SURGERY_ORDER_TYPE_NAME = "Surgery Order";
     static final String GENERAL_ORDER_TYPE_NAME = "General Order";
-    static final String SURGERY_SELECTION_CONCEPT_GP = "bahmnicore.order.surgerySelectionConcept";
-    static final String SURGERY_SELECTION_CONCEPT_DEFAULT = "Select Surgery";
+    static final String SURGERY_SELECTION_CONCEPT_UUID_GP = "bahmnicore.order.surgerySelectionConceptUuid";
+    static final String SURGERY_SELECTION_CONCEPT_DEFAULT_NAME = "Select Surgery";
 
     private final OrderService orderService;
     private final ConceptService conceptService;
@@ -71,17 +71,23 @@ public class SurgeryOrderPostSaveCommandImpl implements EncounterDataPostSaveCom
         return updatedEncounterTransaction;
     }
 
-    private String surgerySelectionConceptName() {
-        return adminService.getGlobalProperty(SURGERY_SELECTION_CONCEPT_GP, SURGERY_SELECTION_CONCEPT_DEFAULT);
+    private Concept getSurgerySelectionConcept() {
+        String conceptUuid = adminService.getGlobalProperty(SURGERY_SELECTION_CONCEPT_UUID_GP, "");
+        if (StringUtils.isNotBlank(conceptUuid)) {
+            return conceptService.getConceptByUuid(conceptUuid);
+        }
+        return conceptService.getConceptByName(SURGERY_SELECTION_CONCEPT_DEFAULT_NAME);
     }
 
     private String findSurgicalAppointmentUuidFromNewObs(Encounter encounter) {
-        String conceptName = surgerySelectionConceptName();
+        Concept surgerySelectionConcept = getSurgerySelectionConcept();
+        if (surgerySelectionConcept == null) {
+            return null;
+        }
         for (org.openmrs.Obs obs : encounter.getObs()) {
             if (!obs.getVoided() && obs.getOrder() == null
                     && obs.getConcept() != null
-                    && obs.getConcept().getName() != null
-                    && conceptName.equals(obs.getConcept().getName().getName())
+                    && obs.getConcept().equals(surgerySelectionConcept)
                     && StringUtils.isNotBlank(obs.getValueComplex())) {
                 return obs.getValueComplex();
             }
@@ -119,7 +125,7 @@ public class SurgeryOrderPostSaveCommandImpl implements EncounterDataPostSaveCom
             return null;
         }
 
-        Concept concept = conceptService.getConceptByName(surgerySelectionConceptName());
+        Concept concept = getSurgerySelectionConcept();
         if (concept == null) {
             return null;
         }
