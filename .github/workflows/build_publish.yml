@@ -37,6 +37,8 @@ jobs:
           EOF
       - name: Pre-populate Maven cache
         run: mvn dependency:resolve --no-transfer-progress -q || true
+      - name: Fix Claude Code native binary
+        run: find / -name "install.cjs" -path "*claude-code*" 2>/dev/null | head -1 | xargs -I{} node {} 2>/dev/null || true
       - name: Install Trivy
         run: |
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin
