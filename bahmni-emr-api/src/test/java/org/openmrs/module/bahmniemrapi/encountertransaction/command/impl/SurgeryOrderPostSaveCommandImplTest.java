@@ -61,16 +61,15 @@ public class SurgeryOrderPostSaveCommandImplTest {
         mockStatic(Context.class);
         command = new SurgeryOrderPostSaveCommandImpl(orderService, conceptService, surgeryObsOrderLinkDao, adminService);
 
-        // GP returns blank → falls back to name lookup
+        // GP configured with a test UUID
+        String testConceptUuid = "test-concept-uuid-123";
         when(adminService.getGlobalProperty(
             SurgeryOrderPostSaveCommandImpl.SURGERY_SELECTION_CONCEPT_UUID_GP, ""))
-            .thenReturn("");
+            .thenReturn(testConceptUuid);
 
         // Shared concept instance — obs detection and order creation both use this
         selectSurgeryConcept = PowerMockito.mock(Concept.class);
-        when(conceptService.getConceptByName(
-            SurgeryOrderPostSaveCommandImpl.SURGERY_SELECTION_CONCEPT_DEFAULT_NAME))
-            .thenReturn(selectSurgeryConcept);
+        when(conceptService.getConceptByUuid(testConceptUuid)).thenReturn(selectSurgeryConcept);
     }
 
     @Test

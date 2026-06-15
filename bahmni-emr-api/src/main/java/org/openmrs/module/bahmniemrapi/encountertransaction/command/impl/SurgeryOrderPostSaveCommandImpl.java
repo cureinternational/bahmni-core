@@ -28,7 +28,6 @@ public class SurgeryOrderPostSaveCommandImpl implements EncounterDataPostSaveCom
     static final String SURGERY_ORDER_TYPE_NAME = "Surgery Order";
     static final String GENERAL_ORDER_TYPE_NAME = "General Order";
     static final String SURGERY_SELECTION_CONCEPT_UUID_GP = "bahmnicore.order.surgerySelectionConceptUuid";
-    static final String SURGERY_SELECTION_CONCEPT_DEFAULT_NAME = "Select Surgery";
 
     private final OrderService orderService;
     private final ConceptService conceptService;
@@ -73,10 +72,10 @@ public class SurgeryOrderPostSaveCommandImpl implements EncounterDataPostSaveCom
 
     private Concept getSurgerySelectionConcept() {
         String conceptUuid = adminService.getGlobalProperty(SURGERY_SELECTION_CONCEPT_UUID_GP, "");
-        if (StringUtils.isNotBlank(conceptUuid)) {
-            return conceptService.getConceptByUuid(conceptUuid);
+        if (StringUtils.isBlank(conceptUuid)) {
+            return null;
         }
-        return conceptService.getConceptByName(SURGERY_SELECTION_CONCEPT_DEFAULT_NAME);
+        return conceptService.getConceptByUuid(conceptUuid);
     }
 
     private String findSurgicalAppointmentUuidFromNewObs(Encounter encounter) {
