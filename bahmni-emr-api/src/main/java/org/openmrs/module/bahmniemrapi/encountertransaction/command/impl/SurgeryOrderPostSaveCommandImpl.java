@@ -9,6 +9,7 @@ import org.openmrs.EncounterProvider;
 import org.openmrs.Order;
 import org.openmrs.OrderType;
 import org.openmrs.Provider;
+import org.openmrs.api.AdministrationService;
 import org.openmrs.api.ConceptService;
 import org.openmrs.api.OrderService;
 import org.openmrs.api.context.Context;
@@ -18,25 +19,30 @@ import org.openmrs.module.emrapi.encounter.domain.EncounterTransaction;
 import org.openmrs.module.operationtheater.api.model.SurgicalAppointment;
 import org.openmrs.module.operationtheater.api.service.SurgicalAppointmentService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
 public class SurgeryOrderPostSaveCommandImpl implements EncounterDataPostSaveCommand {
 
-    static final String SELECT_SURGERY_CONCEPT_NAME = "Select Surgery";
     static final String SURGERY_ORDER_TYPE_NAME = "Surgery Order";
     static final String GENERAL_ORDER_TYPE_NAME = "General Order";
+    static final String SURGERY_SELECTION_CONCEPT_GP = "bahmnicore.order.surgerySelectionConcept";
+    static final String SURGERY_SELECTION_CONCEPT_DEFAULT = "Select Surgery";
 
     private final OrderService orderService;
     private final ConceptService conceptService;
     private final SurgeryObsOrderLinkDao surgeryObsOrderLinkDao;
+    private final AdministrationService adminService;
 
     @Autowired
     public SurgeryOrderPostSaveCommandImpl(OrderService orderService, ConceptService conceptService,
-            SurgeryObsOrderLinkDao surgeryObsOrderLinkDao) {
+            SurgeryObsOrderLinkDao surgeryObsOrderLinkDao,
+            @Qualifier("adminService") AdministrationService adminService) {
         this.orderService = orderService;
         this.conceptService = conceptService;
         this.surgeryObsOrderLinkDao = surgeryObsOrderLinkDao;
+        this.adminService = adminService;
     }
 
     @Override
@@ -65,12 +71,17 @@ public class SurgeryOrderPostSaveCommandImpl implements EncounterDataPostSaveCom
         return updatedEncounterTransaction;
     }
 
+    private String surgerySelectionConceptName() {
+        return adminService.getGlobalProperty(SURGERY_SELECTION_CONCEPT_GP, SURGERY_SELECTION_CONCEPT_DEFAULT);
+    }
+
     private String findSurgicalAppointmentUuidFromNewObs(Encounter encounter) {
+        String conceptName = surgerySelectionConceptName();
         for (org.openmrs.Obs obs : encounter.getObs()) {
             if (!obs.getVoided() && obs.getOrder() == null
                     && obs.getConcept() != null
                     && obs.getConcept().getName() != null
-                    && SELECT_SURGERY_CONCEPT_NAME.equals(obs.getConcept().getName().getName())
+                    && conceptName.equals(obs.getConcept().getName().getName())
                     && StringUtils.isNotBlank(obs.getValueComplex())) {
                 return obs.getValueComplex();
             }
@@ -108,13 +119,11 @@ public class SurgeryOrderPostSaveCommandImpl implements EncounterDataPostSaveCom
             return null;
         }
 
-        // Fix 1: null guard on concept
-        Concept concept = conceptService.getConceptByName(SELECT_SURGERY_CONCEPT_NAME);
+        Concept concept = conceptService.getConceptByName(surgerySelectionConceptName());
         if (concept == null) {
             return null;
         }
 
-        // Fix 3: null guard on careSetting + use enum constant
         CareSetting careSetting = orderService.getCareSettingByName(
                 CareSetting.CareSettingType.OUTPATIENT.toString());
         if (careSetting == null) {

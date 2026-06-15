@@ -4788,6 +4788,21 @@
         </sql>
     </changeSet>
 
+    <changeSet id="add-surgery-selection-concept-gp" author="vivek">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM global_property
+                WHERE property = 'bahmnicore.order.surgerySelectionConcept'
+            </sqlCheck>
+        </preConditions>
+        <insert tableName="global_property">
+            <column name="property" value="bahmnicore.order.surgerySelectionConcept"/>
+            <column name="property_value" value="Select Surgery"/>
+            <column name="description" value="Concept name used to identify surgery selection obs and link orders. Change this if your deployment uses a different concept name."/>
+            <column name="uuid" value="a9f3c2e1-b4d5-4e6f-8a7b-c1d2e3f4a5b6"/>
+        </insert>
+    </changeSet>
+
     <changeSet id="add-surgery-order-type" author="vivek">
         <preConditions onFail="MARK_RAN">
             <sqlCheck expectedResult="0">SELECT COUNT(*) FROM order_type WHERE name = 'Surgery Order'</sqlCheck>

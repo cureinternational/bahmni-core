@@ -14,6 +14,7 @@ import org.openmrs.Obs;
 import org.openmrs.Order;
 import org.openmrs.OrderType;
 import org.openmrs.Provider;
+import org.openmrs.api.AdministrationService;
 import org.openmrs.api.ConceptService;
 import org.openmrs.api.OrderService;
 import org.openmrs.api.context.Context;
@@ -47,6 +48,7 @@ public class SurgeryOrderPostSaveCommandImplTest {
     @Mock private OrderService orderService;
     @Mock private ConceptService conceptService;
     @Mock private SurgeryObsOrderLinkDao surgeryObsOrderLinkDao;
+    @Mock private AdministrationService adminService;
     @Mock private SurgicalAppointmentService surgicalAppointmentService;
 
     private SurgeryOrderPostSaveCommandImpl command;
@@ -56,7 +58,11 @@ public class SurgeryOrderPostSaveCommandImplTest {
         initMocks(this);
         mockStatic(OpenmrsUtil.class);
         mockStatic(Context.class);
-        command = new SurgeryOrderPostSaveCommandImpl(orderService, conceptService, surgeryObsOrderLinkDao);
+        command = new SurgeryOrderPostSaveCommandImpl(orderService, conceptService, surgeryObsOrderLinkDao, adminService);
+        when(adminService.getGlobalProperty(
+            SurgeryOrderPostSaveCommandImpl.SURGERY_SELECTION_CONCEPT_GP,
+            SurgeryOrderPostSaveCommandImpl.SURGERY_SELECTION_CONCEPT_DEFAULT))
+            .thenReturn("Select Surgery");
     }
 
     @Test
