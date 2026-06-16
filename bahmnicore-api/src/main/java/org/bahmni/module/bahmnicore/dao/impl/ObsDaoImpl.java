@@ -320,30 +320,6 @@ public class ObsDaoImpl implements ObsDao {
     }
 
     @Override
-    public List<Obs> getFormBuilderObsForVisits(String patientUuid, List<Integer> visitIds) {
-        if (visitIds == null || visitIds.isEmpty()) return new ArrayList<>();
-
-        String sql = "SELECT DISTINCT o.* " +
-                "FROM obs o " +
-                "JOIN encounter e ON e.encounter_id = o.encounter_id AND e.voided = 0 " +
-                "JOIN visit v ON v.visit_id = e.visit_id " +
-                "JOIN person per ON per.person_id = o.person_id " +
-                "WHERE per.uuid = :patientUuid " +
-                "  AND v.visit_id IN (:visitIds) " +
-                "  AND o.form_namespace_and_path IS NOT NULL " +
-                "  AND o.form_namespace_and_path <> '' " +
-                "  AND o.voided = 0 " +
-                "ORDER BY o.obs_datetime DESC";
-
-        return sessionFactory.getCurrentSession()
-                .createSQLQuery(sql)
-                .addEntity(Obs.class)
-                .setParameter("patientUuid", patientUuid)
-                .setParameterList("visitIds", visitIds)
-                .list();
-    }
-
-    @Override
     public List<Object[]> getFormBuilderFormProjectionForVisits(String patientUuid, List<Integer> visitIds) {
         if (visitIds == null || visitIds.isEmpty()) return new ArrayList<>();
 

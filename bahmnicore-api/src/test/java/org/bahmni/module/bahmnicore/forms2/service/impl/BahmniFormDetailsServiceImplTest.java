@@ -95,7 +95,6 @@ public class BahmniFormDetailsServiceImplTest {
         when(obsService.getObservations(anyListOf(Person.class), anyListOf(Encounter.class), eq(null), eq(null), eq(null), eq(null),
                 eq(null), eq(null), eq(null), eq(null), eq(null), eq(false))).thenReturn(obs);
         when(visitDao.getVisitIdsFor(eq(patientUuid), any())).thenReturn(visitIds);
-        when(obsDao.getFormBuilderObsForVisits(patientUuid, visitIds)).thenReturn(obs);
         when(obsDao.getFormBuilderFormProjectionForVisits(patientUuid, visitIds))
                 .thenReturn(singletonList(formProjectionRow));
     }
