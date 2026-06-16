@@ -36,14 +36,9 @@ jobs:
           </settings>
           EOF
       - name: Pre-populate Maven cache
-        run: mvn dependency:resolve --no-transfer-progress -q || true
-      - name: Fix Claude Code native binary
         run: |
-          CLAUDE=$(which claude 2>/dev/null || true)
-          if [ -n "$CLAUDE" ]; then
-            printf '#!/bin/bash\nexit 0\n' | sudo tee "$CLAUDE" > /dev/null
-            sudo chmod +x "$CLAUDE"
-          fi
+          mvn install -N --no-transfer-progress -q || true
+          mvn dependency:resolve --no-transfer-progress -q || true
       - name: Install Trivy
         run: |
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin
