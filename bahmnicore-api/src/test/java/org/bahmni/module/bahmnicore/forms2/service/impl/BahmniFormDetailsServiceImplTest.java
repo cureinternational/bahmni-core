@@ -65,7 +65,7 @@ public class BahmniFormDetailsServiceImplTest {
     private ObsDao obsDao = mock(ObsDao.class);
     private List<Integer> visitIds = singletonList(1);
     private Object[] formProjectionRow = new Object[]{
-            "Bahmni^TestForm.1/0-0", "enc-uuid", new java.util.Date(),
+            "TestForm.1/0-0", "enc-uuid", new java.util.Date(),
             "visit-uuid-1", new java.util.Date(), "creator-uuid",
             "Richard", null, "Wasikye"
     };
