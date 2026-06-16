@@ -812,6 +812,11 @@
             <name>GitHub Packages</name>
             <url>https://maven.pkg.github.com/cureinternational/openmrs-module-rulesengine</url>
         </repository>
+        <repository>
+            <id>github-operationtheater</id>
+            <name>GitHub Packages - Operation Theater</name>
+            <url>https://maven.pkg.github.com/cureinternational/openmrs-module-operationtheater</url>
+        </repository>
     <repository>
           <id>repo.mybahmni.org-release</id>
           <name>bahmni-artifactory-release</name>
