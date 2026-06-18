@@ -4788,6 +4788,33 @@
         </sql>
     </changeSet>
 
+    <changeSet id="add-surgery-order-type" author="vivek">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">SELECT COUNT(*) FROM order_type WHERE name = 'Surgery Order'</sqlCheck>
+        </preConditions>
+        <insert tableName="order_type">
+            <column name="name" value="Surgery Order"/>
+            <column name="description" value="Order created when an operative report is linked to a surgical appointment"/>
+            <column name="java_class_name" value="org.openmrs.Order"/>
+            <column name="date_created" valueDate="now()"/>
+            <column name="creator" value="1"/>
+            <column name="uuid" value="c1e3d8a2-4f7b-4a9e-b5c6-d2f8e3a1b4c7"/>
+        </insert>
+    </changeSet>
+    <changeSet id="add-general-order-type" author="vivek">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">SELECT COUNT(*) FROM order_type WHERE name = 'General Order'</sqlCheck>
+        </preConditions>
+        <insert tableName="order_type">
+            <column name="name" value="General Order"/>
+            <column name="description" value="Order created for operative forms without a selected surgical appointment"/>
+            <column name="java_class_name" value="org.openmrs.Order"/>
+            <column name="date_created" valueDate="now()"/>
+            <column name="creator" value="1"/>
+            <column name="uuid" value="d4e5f6a7-b8c9-4d2e-a3f1-e7b6c5d4a3f2"/>
+        </insert>
+    </changeSet>
+
     <changeSet id="bahmni-core-20260518-116474-remove-delete-form-draft-privilege" author="Bahmni">
         <preConditions onFail="MARK_RAN">
             <sqlCheck expectedResult="1">

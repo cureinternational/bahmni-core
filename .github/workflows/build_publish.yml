@@ -70,6 +70,11 @@ jobs:
                 <username>${{ github.actor }}</username>
                 <password>${{ secrets.CURE_EMR_ORG_ACCESS_TOKEN }}</password>
               </server>
+              <server>
+                <id>github-operationtheater</id>
+                <username>${{ github.actor }}</username>
+                <password>${{ secrets.CURE_EMR_ORG_ACCESS_TOKEN }}</password>
+              </server>
             </servers>
           </settings>
           EOF

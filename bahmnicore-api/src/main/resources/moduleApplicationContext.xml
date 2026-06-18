@@ -51,6 +51,10 @@
                     <key><value>ProviderObsHandler</value></key>
                     <bean class="org.bahmni.module.bahmnicore.obs.handler.ProviderObsHandler"/>
                 </entry>
+                <entry>
+                    <key><value>SurgicalBlockObsHandler</value></key>
+                    <bean class="org.bahmni.module.bahmnicore.obs.handler.SurgicalBlockObsHandler"/>
+                </entry>
             </map>
         </property>
     </bean>
@@ -133,6 +137,7 @@
             <list>
                 <ref bean="bahmniObservationSaveCommandImpl"/>
                 <ref bean="episodeEncounterCreateCommand"/>
+                <ref bean="surgeryOrderPostSaveCommandImpl"/>
             </list>
         </constructor-arg>
         <constructor-arg ref="bahmniEncounterTransactionMapper" />
