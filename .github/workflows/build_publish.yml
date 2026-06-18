@@ -41,9 +41,7 @@ jobs:
           </settings>
           EOF
       - name: Pre-populate Maven cache
-        run: |
-          mvn install -N --no-transfer-progress -q || true
-          mvn dependency:resolve --no-transfer-progress -q || true
+        run: ./mvnw install -DskipTests --no-transfer-progress -q
       - name: Install Trivy
         run: |
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin
