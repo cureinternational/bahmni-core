@@ -67,6 +67,8 @@ public class BahmniFormDetailsServiceImpl implements BahmniFormDetailsService {
     @Override
     public Collection<FormDetails> getFormDetails(String patientUuid, FormType formType, int numberOfVisits) {
         if (FormType.FORMS2.equals(formType) || formType == null) {
+            getPatient(patientUuid);
+
             List<Integer> visitIds = visitDao.getVisitIdsFor(patientUuid,
                     numberOfVisits > 0 ? numberOfVisits : null);
             if (visitIds.isEmpty()) return Collections.emptyList();

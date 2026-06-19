@@ -113,6 +113,15 @@ public class BahmniFormDetailsServiceImplTest {
     }
 
     @Test
+    public void shouldThrowInvalidParameterExceptionForFormTypeV2WhenPatientDoesNotExist() {
+        when(patientService.getPatientByUuid("patient-uuid")).thenReturn(null);
+        expectedException.expect(InvalidParameterException.class);
+        expectedException.expectMessage("Patient does not exist");
+
+        bahmniFormDetailsService.getFormDetails("patient-uuid", FormType.FORMS2, -1);
+    }
+
+    @Test
     public void shouldReturnFormDetailsForGivenPatientUuidAndFormTypeIsV2() {
         Collection<FormDetails> formBuilderFormDetails = bahmniFormDetailsService.getFormDetails("patient-uuid", FormType.FORMS2, -1);
 
