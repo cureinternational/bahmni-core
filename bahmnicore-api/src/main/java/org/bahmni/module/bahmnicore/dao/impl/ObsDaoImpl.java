@@ -19,6 +19,8 @@ import org.openmrs.util.LocaleUtility;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -26,6 +28,7 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.stream.Collectors;
 
 import static java.util.Objects.nonNull;
 
@@ -315,6 +318,68 @@ public class ObsDaoImpl implements ObsDao {
             queryToGetObs.setParameter("endDate", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(endDate));
 
         return queryToGetObs.list();
+    }
+
+    @Override
+    public List<Object[]> getFormBuilderFormProjectionForVisits(String patientUuid, List<Integer> visitIds) {
+        if (visitIds == null || visitIds.isEmpty()) return new ArrayList<>();
+
+        final String placeholders = visitIds.stream().map(id -> "?").collect(Collectors.joining(","));
+        final String sql =
+                "SELECT " +
+                "  SUBSTRING_INDEX(MIN(o.form_namespace_and_path), '^', -1), " +
+                "  e.uuid, " +
+                "  e.encounter_datetime, " +
+                "  v.uuid, " +
+                "  v.date_started, " +
+                "  u.uuid, " +
+                "  pn.given_name, " +
+                "  pn.middle_name, " +
+                "  pn.family_name " +
+                "FROM encounter e " +
+                "JOIN visit v        ON v.visit_id = e.visit_id AND v.voided = 0 " +
+                "                    AND v.visit_id IN (" + placeholders + ") " +
+                "JOIN person per     ON per.person_id = e.patient_id AND per.uuid = ? " +
+                "JOIN obs o          ON o.encounter_id = e.encounter_id " +
+                "                    AND o.voided = 0 " +
+                "                    AND o.form_namespace_and_path IS NOT NULL " +
+                "                    AND o.form_namespace_and_path <> '' " +
+                "JOIN users u        ON u.user_id = o.creator " +
+                "JOIN person_name pn ON pn.person_id = u.person_id AND pn.voided = 0 " +
+                "WHERE e.voided = 0 " +
+                "GROUP BY " +
+                "  o.encounter_id, " +
+                "  SUBSTRING_INDEX(SUBSTRING_INDEX(o.form_namespace_and_path, '^', -1), '/', 1), " +
+                "  e.uuid, e.encounter_datetime, v.uuid, v.date_started, " +
+                "  u.uuid, pn.given_name, pn.middle_name, pn.family_name " +
+                "ORDER BY e.encounter_datetime DESC";
+
+        final List<Object[]> results = new ArrayList<>();
+        sessionFactory.getCurrentSession().doWork(connection -> {
+            try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+                int index = 1;
+                for (Integer visitId : visitIds) {
+                    stmt.setInt(index++, visitId);
+                }
+                stmt.setString(index, patientUuid);
+                try (ResultSet rs = stmt.executeQuery()) {
+                    while (rs.next()) {
+                        results.add(new Object[]{
+                                rs.getString(1),
+                                rs.getString(2),
+                                rs.getTimestamp(3),
+                                rs.getString(4),
+                                rs.getTimestamp(5),
+                                rs.getString(6),
+                                rs.getString(7),
+                                rs.getString(8),
+                                rs.getString(9)
+                        });
+                    }
+                }
+            }
+        });
+        return results;
     }
 
     private String commaSeparatedFormNamesPattern(List<String> formNames) {

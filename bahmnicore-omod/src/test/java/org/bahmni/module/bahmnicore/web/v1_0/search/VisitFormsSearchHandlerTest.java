@@ -14,8 +14,9 @@ import org.openmrs.Encounter;
 import org.openmrs.Location;
 import org.openmrs.Obs;
 import org.openmrs.Patient;
+import org.bahmni.module.bahmnicore.dao.ObsDao;
+import org.bahmni.module.bahmnicore.dao.VisitDao;
 import org.openmrs.PatientProgram;
-import org.openmrs.Visit;
 import org.openmrs.api.ConceptService;
 import org.openmrs.api.EncounterService;
 import org.openmrs.api.ObsService;
@@ -79,6 +80,10 @@ public class VisitFormsSearchHandlerTest {
     private BahmniProgramWorkflowService programWorkflowService;
     @Mock
     private EpisodeService episodeService;
+    @Mock
+    private VisitDao visitDao;
+    @Mock
+    private ObsDao obsDao;
     private Patient patient;
     private Concept concept;
     private Obs obs;
@@ -133,14 +138,12 @@ public class VisitFormsSearchHandlerTest {
 
         PowerMockito.when(identifyLocale(any())).thenReturn(Locale.ENGLISH);
 
-        Visit visit = new Visit();
         PowerMockito.when(Context.getVisitService()).thenReturn(visitService);
-        PowerMockito.when(Context.getVisitService().getVisitsByPatient(patient)).thenReturn(Arrays.asList(visit));
-
         PowerMockito.when(Context.getEncounterService()).thenReturn(encounterService);
         Encounter encounter = mock(Encounter.class);
         PowerMockito.when(encounterService.getEncounters(any(Patient.class), eq(null), eq(null), eq(null), eq(null), eq(null), eq(null), eq(null), any(Collection.class), eq(false))).thenReturn(Arrays.asList(encounter));
         PowerMockito.when(Context.getObsService()).thenReturn(obsService);
+        when(visitDao.getVisitIdsFor(any(String.class), any(Integer.class))).thenReturn(Arrays.asList(1));
         obs = createObs(concept);
     }
 
@@ -163,7 +166,7 @@ public class VisitFormsSearchHandlerTest {
         when(context.getRequest().getParameterValues("conceptNames")).thenReturn(conceptNames);
         concept = createConcept("Vitals", "en");
 
-        PowerMockito.when(obsService.getObservations(any(List.class), any(List.class), eq(null), eq(null), eq(null), eq(null), eq(null), eq(null), eq(null), eq(null), eq(null), eq(false))).thenReturn(Arrays.asList(obs));
+        when(obsDao.getObsByPatientAndVisit(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(Arrays.asList(obs));
         NeedsPaging<Obs> searchResults = (NeedsPaging<Obs>) visitFormsSearchHandler.search(context);
         assertThat(searchResults.getPageOfResults().size(), is(equalTo(1)));
     }
@@ -178,7 +181,7 @@ public class VisitFormsSearchHandlerTest {
         Concept obsConcept = createConcept("Vitals_fr", "fr");
         Obs obs = createObs(obsConcept);
 
-        PowerMockito.when(obsService.getObservations(any(List.class), any(List.class), eq(null), eq(null), eq(null), eq(null), eq(null), eq(null), eq(null), eq(null), eq(null), eq(false))).thenReturn(Arrays.asList(obs));
+        when(obsDao.getObsByPatientAndVisit(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(Arrays.asList(obs));
         NeedsPaging<Obs> searchResults = (NeedsPaging<Obs>) visitFormsSearchHandler.search(context);
         assertThat(searchResults.getPageOfResults().size(), is(equalTo(1)));
     }
@@ -193,7 +196,7 @@ public class VisitFormsSearchHandlerTest {
         Concept obsConcept = createConcept("Vitals", "en");
         Obs obs = createObs(obsConcept);
 
-        PowerMockito.when(obsService.getObservations(any(List.class), any(List.class), eq(null), eq(null), eq(null), eq(null), eq(null), eq(null), eq(null), eq(null), eq(null), eq(false))).thenReturn(Arrays.asList(obs));
+        when(obsDao.getObsByPatientAndVisit(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(Arrays.asList(obs));
         NeedsPaging<Obs> searchResults = (NeedsPaging<Obs>) visitFormsSearchHandler.search(context);
         assertThat(searchResults.getPageOfResults().size(), is(equalTo(1)));
     }
@@ -214,7 +217,7 @@ public class VisitFormsSearchHandlerTest {
         Concept obsConcept = createConcept("History and Examination", "en");
         Obs obs = createObs(obsConcept);
 
-        PowerMockito.when(obsService.getObservations(any(List.class), any(List.class), eq(null), eq(null), eq(null), eq(null), eq(null), eq(null), eq(null), eq(null), eq(null), eq(false))).thenReturn(Arrays.asList(obs));
+        when(obsDao.getObsByPatientAndVisit(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(Arrays.asList(obs));
         NeedsPaging<Obs> searchResults = (NeedsPaging<Obs>) visitFormsSearchHandler.search(context);
         assertThat(searchResults.getPageOfResults().size(), is(equalTo(1)));
     }
@@ -232,7 +235,7 @@ public class VisitFormsSearchHandlerTest {
 
         Obs obs2 = createObs(historyConcept);
 
-        PowerMockito.when(obsService.getObservations(any(List.class), any(List.class), eq(null), eq(null), eq(null), eq(null), eq(null), eq(null), eq(null), eq(null), eq(null), eq(false))).thenReturn(Arrays.asList(obs, obs2));
+        when(obsDao.getObsByPatientAndVisit(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(Arrays.asList(obs, obs2));
         NeedsPaging<Obs> searchResults = (NeedsPaging<Obs>) visitFormsSearchHandler.search(context);
         assertThat(searchResults.getPageOfResults().size(), is(equalTo(2)));
     }
@@ -262,6 +265,47 @@ public class VisitFormsSearchHandlerTest {
         when(context.getRequest().getParameter("patient")).thenReturn(null);
 
         visitFormsSearchHandler.search(context);
+    }
+
+    @Test
+    public void shouldFetchObsViaVisitDaoAndObsDaoForNonProgramSearch() {
+        String[] conceptNames = new String[]{"Vitals"};
+        when(context.getRequest().getParameterValues("conceptNames")).thenReturn(conceptNames);
+        when(visitDao.getVisitIdsFor("patientUuid", 10)).thenReturn(Arrays.asList(1));
+        when(obsDao.getObsByPatientAndVisit(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(Arrays.asList(obs));
+
+        NeedsPaging<Obs> searchResults = (NeedsPaging<Obs>) visitFormsSearchHandler.search(context);
+
+        assertThat(searchResults.getPageOfResults().size(), is(equalTo(1)));
+        verify(visitDao, times(1)).getVisitIdsFor("patientUuid", 10);
+        verify(obsDao, times(1)).getObsByPatientAndVisit(any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(obsService, never()).getObservations(any(List.class), any(List.class), eq(null), eq(null), eq(null), eq(null), eq(null), eq(null), eq(null), eq(null), eq(null), eq(false));
+    }
+
+    @Test
+    public void shouldReturnEmptyResultWhenNoVisitsExistForNonProgramSearch() {
+        String[] conceptNames = new String[]{"Vitals"};
+        when(context.getRequest().getParameterValues("conceptNames")).thenReturn(conceptNames);
+        when(visitDao.getVisitIdsFor("patientUuid", 10)).thenReturn(new ArrayList<>());
+
+        NeedsPaging<Obs> searchResults = (NeedsPaging<Obs>) visitFormsSearchHandler.search(context);
+
+        assertThat(searchResults.getPageOfResults().size(), is(equalTo(0)));
+        verify(visitDao, times(1)).getVisitIdsFor("patientUuid", 10);
+        verify(obsDao, never()).getObsByPatientAndVisit(any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    public void shouldReturnEmptyResultWhenAllConceptNamesAreNullForNonProgramSearch() {
+        String[] conceptNames = new String[]{null, null};
+        when(context.getRequest().getParameterValues("conceptNames")).thenReturn(conceptNames);
+
+        NeedsPaging<Obs> searchResults = (NeedsPaging<Obs>) visitFormsSearchHandler.search(context);
+
+        assertThat(searchResults.getPageOfResults().size(), is(equalTo(0)));
+        verify(visitDao, never()).getVisitIdsFor(any(String.class), any(Integer.class));
+        verify(obsDao, never()).getObsByPatientAndVisit(any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
