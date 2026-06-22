@@ -7,8 +7,10 @@ import org.openmrs.Concept;
 import org.openmrs.Encounter;
 import org.openmrs.Obs;
 import org.openmrs.Patient;
+import org.bahmni.module.bahmnicore.dao.ObsDao;
+import org.bahmni.module.bahmnicore.dao.VisitDao;
+import org.bahmni.module.bahmnicore.dao.impl.ObsDaoImpl;
 import org.openmrs.PatientProgram;
-import org.openmrs.Visit;
 import org.openmrs.api.APIException;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.episodes.Episode;
@@ -30,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.stream.Collectors;
 
 import static java.util.Arrays.asList;
 import static org.bahmni.module.bahmnicore.web.v1_0.LocaleResolver.identifyLocale;
@@ -38,6 +41,10 @@ import static org.bahmni.module.bahmnicore.web.v1_0.LocaleResolver.identifyLocal
 public class VisitFormsSearchHandler implements SearchHandler {
     @Autowired
     private EpisodeService episodeService;
+    @Autowired
+    private VisitDao visitDao;
+    @Autowired
+    private ObsDao obsDao;
     private final String ALL_OBSERVATION_TEMPLATES = "All Observation Templates";
     private final String QUERY_INFORMATION = "Allows you to search All Observation Templates by patientUuid";
 
@@ -72,16 +79,26 @@ public class VisitFormsSearchHandler implements SearchHandler {
             conceptNamesList = asList(conceptNames);
         }
 
-        List<Encounter> encounterList;
+        List<Obs> finalObsList;
         if (patientProgramUuid != null) {
-            encounterList = getEncountersWithinProgram(patientProgramUuid);
+            List<Encounter> encounterList = getEncountersWithinProgram(patientProgramUuid);
+            finalObsList = getObservations(patient, conceptNamesList, encounterList, searchLocale);
         } else {
-            encounterList = getEncountersFor(numberOfVisits, patient);
+            List<String> nonNullConceptNames = conceptNamesList.stream()
+                    .filter(name -> name != null)
+                    .collect(Collectors.toList());
+            if (CollectionUtils.isEmpty(nonNullConceptNames)) {
+                return new NeedsPaging<>(Collections.emptyList(), context);
+            }
+            List<Integer> visitIds = visitDao.getVisitIdsFor(patientUuid, numberOfVisits);
+            if (CollectionUtils.isEmpty(visitIds)) {
+                return new NeedsPaging<>(Collections.emptyList(), context);
+            }
+            finalObsList = obsDao.getObsByPatientAndVisit(patientUuid, nonNullConceptNames, visitIds,
+                    Integer.MAX_VALUE, ObsDaoImpl.OrderBy.DESC, null, false, null, null, null);
         }
 
-        List<Obs> finalObsList = getObservations(patient, conceptNamesList, encounterList, searchLocale);
-
-        return new NeedsPaging<Obs>(finalObsList, context);
+        return new NeedsPaging<>(finalObsList, context);
     }
 
     private List<Obs> getObservations(Patient patient, List<String> conceptNames, List<Encounter> encounterList, Locale searchLocale) {
@@ -102,13 +119,6 @@ public class VisitFormsSearchHandler implements SearchHandler {
             }
         }
         return finalObsList;
-    }
-
-    private List<Encounter> getEncountersFor(int numberOfVisits, Patient patient) {
-        List<Encounter> encounterList;
-        List<Visit> listOfVisitsNeeded = listOfVisitsNeeded(numberOfVisits, patient);
-        encounterList = Context.getEncounterService().getEncounters(patient, null, null, null, null, null, null, null, listOfVisitsNeeded, false);
-        return encounterList;
     }
 
     private List<Encounter> getEncountersWithinProgram(String patientProgramUuid) {
@@ -138,12 +148,4 @@ public class VisitFormsSearchHandler implements SearchHandler {
             return concept.getFullySpecifiedName(LocaleUtility.getDefaultLocale()).getName();
     }
 
-    private List<Visit> listOfVisitsNeeded(int numberOfVisits, Patient patient) {
-        List<Visit> visitsByPatient = Context.getVisitService().getVisitsByPatient(patient);
-        int subsetVisits = numberOfVisits;
-        if (visitsByPatient.size() < numberOfVisits) {
-            subsetVisits = visitsByPatient.size();
-        }
-        return visitsByPatient.subList(0, subsetVisits);
-    }
 }

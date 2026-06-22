@@ -1,5 +1,7 @@
 package org.bahmni.module.bahmnicore.forms2.service.impl;
 
+import org.bahmni.module.bahmnicore.dao.ObsDao;
+import org.bahmni.module.bahmnicore.dao.VisitDao;
 import org.bahmni.module.bahmnicore.forms2.contract.FormType;
 import org.bahmni.module.bahmnicore.forms2.contract.FormDetails;
 import org.bahmni.module.bahmnicore.forms2.service.BahmniFormDetailsService;
@@ -23,8 +25,12 @@ import java.security.InvalidParameterException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.util.Collections.singletonList;
 import static org.apache.commons.collections.CollectionUtils.isNotEmpty;
@@ -39,22 +45,38 @@ public class BahmniFormDetailsServiceImpl implements BahmniFormDetailsService {
     private final ObsService obsService;
     private BahmniVisitService bahmniVisitService;
     private BahmniProgramWorkflowService bahmniProgramWorkflowService;
+    private final VisitDao visitDao;
+    private final ObsDao obsDao;
 
     @Autowired
     public BahmniFormDetailsServiceImpl(PatientService patientService, VisitService visitService,
                                         EncounterService encounterService, ObsService obsService,
                                         BahmniVisitService bahmniVisitService,
-                                        BahmniProgramWorkflowService bahmniProgramWorkflowService) {
+                                        BahmniProgramWorkflowService bahmniProgramWorkflowService,
+                                        VisitDao visitDao, ObsDao obsDao) {
         this.visitService = visitService;
         this.patientService = patientService;
         this.encounterService = encounterService;
         this.obsService = obsService;
         this.bahmniVisitService = bahmniVisitService;
         this.bahmniProgramWorkflowService = bahmniProgramWorkflowService;
+        this.visitDao = visitDao;
+        this.obsDao = obsDao;
     }
 
     @Override
     public Collection<FormDetails> getFormDetails(String patientUuid, FormType formType, int numberOfVisits) {
+        if (FormType.FORMS2.equals(formType) || formType == null) {
+            getPatient(patientUuid);
+
+            List<Integer> visitIds = visitDao.getVisitIdsFor(patientUuid,
+                    numberOfVisits > 0 ? numberOfVisits : null);
+            if (visitIds.isEmpty()) return Collections.emptyList();
+
+            List<Object[]> rows = obsDao.getFormBuilderFormProjectionForVisits(patientUuid, visitIds);
+            return mapProjectionToFormDetails(rows);
+        }
+
         Patient patient = getPatient(patientUuid);
         List<Visit> visits = visitService.getVisitsByPatient(patient);
 
@@ -117,6 +139,42 @@ public class BahmniFormDetailsServiceImpl implements BahmniFormDetailsService {
             return getFormDetails(patient, new ArrayList<>(encountersByPatientProgramUuid), formType);
         }
         return Collections.emptyList();
+    }
+
+    private Collection<FormDetails> mapProjectionToFormDetails(List<Object[]> rows) {
+        Map<FormDetails, FormDetails> formDetailsMap = new HashMap<>();
+        for (Object[] row : rows) {
+            String formFieldPath  = (String) row[0];
+            String encounterUuid  = (String) row[1];
+            Date encounterDt      = (Date)   row[2];
+            String visitUuid      = (String) row[3];
+            Date visitStartDt     = (Date)   row[4];
+            String providerUuid   = (String) row[5];
+            String givenName      = (String) row[6];
+            String middleName     = (String) row[7];
+            String familyName     = (String) row[8];
+
+            FormDetails fd = new FormDetails();
+            fd.setFormType(FormType.FORMS2.getType());
+            fd.setFormName(FormUtil.getFormNameFromFieldPath(formFieldPath));
+            fd.setFormVersion(FormUtil.getFormVersionFromFieldPath(formFieldPath));
+            fd.setEncounterUuid(encounterUuid);
+            fd.setEncounterDateTime(encounterDt);
+            fd.setVisitUuid(visitUuid);
+            fd.setVisitStartDateTime(visitStartDt);
+
+            String fullName = Stream.of(givenName, middleName, familyName)
+                    .filter(s -> s != null && !s.isEmpty())
+                    .collect(Collectors.joining(" "));
+
+            if (formDetailsMap.containsKey(fd)) {
+                formDetailsMap.get(fd).addProvider(fullName, providerUuid);
+            } else {
+                fd.addProvider(fullName, providerUuid);
+                formDetailsMap.put(fd, fd);
+            }
+        }
+        return formDetailsMap.keySet();
     }
 
     private List<Visit> limitVisits(List<Visit> visits, int numberOfVisits) {
