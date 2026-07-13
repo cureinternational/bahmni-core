@@ -23,9 +23,9 @@ public class SurgeryObsOrderLinkPreSaveCommandImplTest {
     private static final String ORDER_UUID_1 = "order-uuid-1";
     private static final String ORDER_UUID_2 = "order-uuid-2";
     private static final String OTHER_CONCEPT_UUID = "other-concept-uuid";
-    private static final String FORM_1_PATH_PREFIX_PATH_PREFIX = "ENT Operative Report.1";
-    private static final String FORM_2_PATH_PREFIX_PATH_PREFIX = "Ortho Operative Report.1";
-    private static final String FORM_3_PATH_PREFIX_PATH_PREFIX = "General Consultation.1";
+    private static final String FORM_1_PATH_PREFIX = "ENT Operative Report.1";
+    private static final String FORM_2_PATH_PREFIX = "Ortho Operative Report.1";
+    private static final String FORM_3_PATH_PREFIX = "General Consultation.1";
 
     @Mock
     private AdministrationService adminService;
