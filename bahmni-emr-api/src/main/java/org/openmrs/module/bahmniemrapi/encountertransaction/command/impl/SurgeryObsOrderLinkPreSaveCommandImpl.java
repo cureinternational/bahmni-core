@@ -10,7 +10,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 @Component
 public class SurgeryObsOrderLinkPreSaveCommandImpl implements EncounterDataPreSaveCommand {
@@ -31,14 +35,31 @@ public class SurgeryObsOrderLinkPreSaveCommandImpl implements EncounterDataPreSa
             return bahmniEncounterTransaction;
         }
 
-        Collection<BahmniObservation> observations = bahmniEncounterTransaction.getObservations();
-        String orderUuid = findOrderUuid(observations, surgerySelectionConceptUuid);
-        if (StringUtils.isBlank(orderUuid)) {
-            return bahmniEncounterTransaction;
+        Map<String, List<BahmniObservation>> obsByForm = groupObsByForm(bahmniEncounterTransaction.getObservations());
+        for (List<BahmniObservation> formObs : obsByForm.values()) {
+            String orderUuid = findOrderUuid(formObs, surgerySelectionConceptUuid);
+            if (StringUtils.isNotBlank(orderUuid)) {
+                setOrderUuidOnObs(formObs, orderUuid);
+            }
         }
 
-        setOrderUuidOnObs(observations, orderUuid);
         return bahmniEncounterTransaction;
+    }
+
+    private Map<String, List<BahmniObservation>> groupObsByForm(Collection<BahmniObservation> observations) {
+        Map<String, List<BahmniObservation>> result = new LinkedHashMap<>();
+        for (BahmniObservation obs : observations) {
+            result.computeIfAbsent(extractFormName(obs.getFormFieldPath()), k -> new ArrayList<>()).add(obs);
+        }
+        return result;
+    }
+
+    private String extractFormName(String formFieldPath) {
+        if (StringUtils.isBlank(formFieldPath)) {
+            return "";
+        }
+        int slash = formFieldPath.indexOf('/');
+        return slash >= 0 ? formFieldPath.substring(0, slash) : formFieldPath;
     }
 
     private String findOrderUuid(Collection<BahmniObservation> observations, String surgerySelectionConceptUuid) {
