@@ -13,12 +13,21 @@ public class DiscardAllFormDraftsTask extends AbstractTask {
     @Override
     public void execute() {
         try {
-            log.info("DiscardAllFormDraftsTask: starting midnight discard of all form drafts");
+            log.info("DiscardAllFormDraftsTask: starting midnight task");
+
             FormDraftService formDraftService = Context.getService(FormDraftService.class);
+
+            // Step 1: Discard all non-voided drafts (soft delete/void)
+            log.debug("DiscardAllFormDraftsTask: discarding all non-voided drafts");
             formDraftService.discardAllDrafts();
+
+            // Step 2: Delete drafts older than retention period (hard delete)
+            log.debug("DiscardAllFormDraftsTask: deleting drafts older than retention period");
+            formDraftService.deleteDraftsOlderThanRetentionPeriod();
+
             log.info("DiscardAllFormDraftsTask: completed successfully");
         } catch (Exception e) {
-            log.error("DiscardAllFormDraftsTask: failed to discard all form drafts", e);
+            log.error("DiscardAllFormDraftsTask: failed during execution", e);
         }
     }
 }
