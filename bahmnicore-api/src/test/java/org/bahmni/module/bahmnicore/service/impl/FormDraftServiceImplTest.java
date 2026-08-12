@@ -32,6 +32,7 @@ import org.openmrs.api.EncounterService;
 import org.openmrs.api.PatientService;
 import org.openmrs.api.ProviderService;
 import org.openmrs.api.UserService;
+import org.openmrs.api.context.Context;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
