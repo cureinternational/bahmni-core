@@ -475,8 +475,12 @@ public class FormDraftServiceImpl implements FormDraftService {
     @Override
     public void deleteDraftsOlderThanRetentionPeriod() {
         try {
-            Integer retentionDays = Integer.parseInt(Context.getAdministrationService()
-                    .getGlobalProperty(VOIDED_RETENTION_DAYS_PROPERTY));
+            String retentionDaysStr = Context.getAdministrationService()
+                    .getGlobalProperty(VOIDED_RETENTION_DAYS_PROPERTY);
+            if (retentionDaysStr == null) {
+                throw new IllegalStateException("Global property '" + VOIDED_RETENTION_DAYS_PROPERTY + "' is not set");
+            }
+            Integer retentionDays = Integer.parseInt(retentionDaysStr);
             Integer deletedCount = formDraftDAO.deleteDraftsOlderThanDays(retentionDays);
             log.info("Deleted {} form drafts older than {} days", deletedCount, retentionDays);
         } catch (Exception e) {
