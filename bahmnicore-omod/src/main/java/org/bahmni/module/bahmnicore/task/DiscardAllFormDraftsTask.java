@@ -17,11 +17,10 @@ public class DiscardAllFormDraftsTask extends AbstractTask {
 
             FormDraftService formDraftService = Context.getService(FormDraftService.class);
 
-            // Step 1: Discard all non-voided drafts (soft delete/void)
+
             log.debug("DiscardAllFormDraftsTask: discarding all non-voided drafts");
             formDraftService.discardAllDrafts();
 
-            // Step 2: Delete drafts older than retention period (hard delete)
             log.debug("DiscardAllFormDraftsTask: deleting drafts older than retention period");
             formDraftService.deleteDraftsOlderThanRetentionPeriod();
 

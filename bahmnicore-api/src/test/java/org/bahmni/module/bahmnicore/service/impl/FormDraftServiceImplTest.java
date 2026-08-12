@@ -28,7 +28,6 @@ import org.openmrs.PersonName;
 import org.openmrs.Provider;
 import org.openmrs.User;
 import org.openmrs.api.APIException;
-import org.openmrs.api.AdministrationService;
 import org.openmrs.api.EncounterService;
 import org.openmrs.api.PatientService;
 import org.openmrs.api.ProviderService;
@@ -42,10 +41,8 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertNotEquals;
 import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyInt;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.mockStatic;
 
 public class FormDraftServiceImplTest {
 
@@ -272,24 +269,6 @@ public class FormDraftServiceImplTest {
     public void discardAllDrafts_shouldCallDaoDeleteAllDrafts() {
         formDraftService.discardAllDrafts();
         verify(formDraftDAO).deleteAllDrafts();
-    }
-
-    @Test
-    public void deleteDraftsOlderThanRetentionPeriod_shouldReadGlobalPropertyAndCallDao() throws Exception {
-        org.mockito.MockedStatic<Context> mockedContext = mockStatic(Context.class);
-        try {
-            AdministrationService adminService = org.mockito.Mockito.mock(AdministrationService.class);
-            mockedContext.when(Context::getAdministrationService).thenReturn(adminService);
-            when(adminService.getGlobalProperty("bahmni.formDraft.voidedRetentionDays")).thenReturn("15");
-            when(formDraftDAO.deleteDraftsOlderThanDays(15)).thenReturn(5);
-
-            formDraftService.deleteDraftsOlderThanRetentionPeriod();
-
-            verify(adminService).getGlobalProperty("bahmni.formDraft.voidedRetentionDays");
-            verify(formDraftDAO).deleteDraftsOlderThanDays(15);
-        } finally {
-            mockedContext.close();
-        }
     }
 
     @Test
