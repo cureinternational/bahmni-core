@@ -102,13 +102,13 @@ public class FormDraftDaoImpl implements FormDraftDAO {
     }
 
     @Override
-    public int deleteDraftsOlderThanDays(int retentionDays) throws DAOException {
+    public Integer deleteDraftsOlderThanDays(Integer retentionDays) throws DAOException {
         try {
             Calendar calendar = Calendar.getInstance();
             calendar.add(Calendar.DAY_OF_MONTH, -retentionDays);
             Date cutoffDate = calendar.getTime();
 
-            int deletedCount = sessionFactory.getCurrentSession()
+            Integer deletedCount = sessionFactory.getCurrentSession()
                     .createQuery("DELETE FROM FormDraft WHERE dateCreated < :cutoffDate")
                     .setParameter("cutoffDate", cutoffDate)
                     .executeUpdate();

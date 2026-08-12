@@ -54,5 +54,5 @@ public interface FormDraftDAO {
      * @param retentionDays the number of days to retain drafts
      * @return the number of draft records deleted
      */
-    int deleteDraftsOlderThanDays(int retentionDays);
+    Integer deleteDraftsOlderThanDays(Integer retentionDays);
 }
