@@ -48,7 +48,10 @@ public class SurgeryObsOrderLinkPreSaveCommandImpl implements EncounterDataPreSa
     private Map<String, List<BahmniObservation>> groupObsByForm(Collection<BahmniObservation> observations) {
         Map<String, List<BahmniObservation>> result = new LinkedHashMap<>();
         for (BahmniObservation obs : observations) {
-            result.computeIfAbsent(extractFormName(obs.getFormFieldPath()), k -> new ArrayList<>()).add(obs);
+            String formName = extractFormName(obs.getFormFieldPath());
+            if (StringUtils.isNotBlank(formName)) {
+                result.computeIfAbsent(formName, k -> new ArrayList<>()).add(obs);
+            }
         }
         return result;
     }

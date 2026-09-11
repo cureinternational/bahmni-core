@@ -134,6 +134,24 @@ public class SurgeryObsOrderLinkPreSaveCommandImplTest {
     }
 
     @Test
+    public void shouldNotStampObsWithBlankFormFieldPath() {
+        BahmniObservation selectSurgeryObs = obs(SELECT_SURGERY_CONCEPT_UUID, ORDER_UUID_1, FORM_1_PATH_PREFIX);
+        BahmniObservation unscopedObs = new BahmniObservation();
+        EncounterTransaction.Concept concept = new EncounterTransaction.Concept();
+        concept.setUuid(OTHER_CONCEPT_UUID);
+        unscopedObs.setConcept(concept);
+        unscopedObs.setValue("unscoped value");
+        unscopedObs.setConceptSortWeight(0);
+
+        BahmniEncounterTransaction transaction = new BahmniEncounterTransaction();
+        transaction.setObservations(Arrays.asList(selectSurgeryObs, unscopedObs));
+
+        command.update(transaction);
+
+        assertNull(unscopedObs.getOrderUuid());
+    }
+
+    @Test
     public void shouldSkipWhenGlobalPropertyNotConfigured() {
         when(adminService.getGlobalProperty(SurgeryObsOrderLinkPreSaveCommandImpl.SURGERY_SELECTION_CONCEPT_UUID_GP, ""))
                 .thenReturn("");
