@@ -2,6 +2,7 @@ package org.bahmni.module.bahmnicore.web.v1_0.controller.display.controls;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
+import org.bahmni.module.bahmnicore.dao.VisitDao;
 import org.bahmni.module.bahmnicore.extensions.BahmniExtensions;
 import org.bahmni.module.bahmnicore.obs.ObservationsAdder;
 import org.bahmni.module.bahmnicore.service.BahmniObsService;
@@ -35,6 +36,7 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -50,13 +52,15 @@ public class BahmniObservationsController extends BaseRestController {
     private BahmniObsService bahmniObsService;
     private ConceptService conceptService;
     private VisitService visitService;
+    private VisitDao visitDao;
     private BahmniExtensions bahmniExtensions;
 
     @Autowired
-    public BahmniObservationsController(BahmniObsService bahmniObsService, ConceptService conceptService, VisitService visitService, BahmniExtensions bahmniExtensions) {
+    public BahmniObservationsController(BahmniObsService bahmniObsService, ConceptService conceptService, VisitService visitService, VisitDao visitDao, BahmniExtensions bahmniExtensions) {
         this.bahmniObsService = bahmniObsService;
         this.conceptService = conceptService;
         this.visitService = visitService;
+        this.visitDao = visitDao;
         this.bahmniExtensions = bahmniExtensions;
     }
 
@@ -98,16 +102,14 @@ public class BahmniObservationsController extends BaseRestController {
             return responses;
         }
 
+        List<Concept> concepts = MiscUtils.getConceptsForNames(conceptNames, conceptService);
+        List<Visit> visits = visitDao.getVisitsByUuids(request.getVisitUuids());
+
+        Map<String, Collection<BahmniObservation>> observationsByVisitUuid =
+                bahmniObsService.getObsByVisitsAndConcepts(visits, concepts, conceptNames, obsIgnoreList, filterObsWithOrders, scope);
+
         for (String visitUuid : request.getVisitUuids()) {
-            Visit visit = visitService.getVisitByUuid(visitUuid);
-            Collection<BahmniObservation> observations;
-            if (INITIAL.equalsIgnoreCase(scope)) {
-                observations = bahmniObsService.getInitialObsByVisit(visit, MiscUtils.getConceptsForNames(conceptNames, conceptService), obsIgnoreList, filterObsWithOrders);
-            } else if (LATEST.equalsIgnoreCase(scope)) {
-                observations = bahmniObsService.getLatestObsByVisit(visit, MiscUtils.getConceptsForNames(conceptNames, conceptService), obsIgnoreList, filterObsWithOrders);
-            } else {
-                observations = bahmniObsService.getObservationForVisit(visitUuid, conceptNames, MiscUtils.getConceptsForNames(obsIgnoreList, conceptService), filterObsWithOrders, null);
-            }
+            Collection<BahmniObservation> observations = observationsByVisitUuid.getOrDefault(visitUuid, Collections.emptyList());
             responses.add(new VisitObservationsResponse(visitUuid, observations));
         }
         return responses;

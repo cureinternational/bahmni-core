@@ -10,9 +10,11 @@ import org.openmrs.Patient;
 import org.openmrs.Visit;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class VisitDaoImplIT extends BaseIntegrationTest {
     
@@ -45,5 +47,21 @@ public class VisitDaoImplIT extends BaseIntegrationTest {
     public void shouldNotGetVoidedEncounter() throws Exception {
         List<Encounter> admitAndDischargeEncounters = visitDao.getAdmitAndDischargeEncounters(902);
         assertEquals(1, admitAndDischargeEncounters.size());
+    }
+
+    @Test
+    public void shouldGetMultipleVisitsInOneBulkCallByUuid() throws Exception {
+        List<Visit> visits = visitDao.getVisitsByUuids(Arrays.asList(
+                "ad41fb41-a41a-4ad6-8835-2f59099acf5t", "ad41fb41-a41a-4ad6-8835-2f59099acf5b"));
+
+        assertEquals(2, visits.size());
+        List<Integer> visitIds = Arrays.asList(visits.get(0).getVisitId(), visits.get(1).getVisitId());
+        assertTrue(visitIds.contains(901));
+        assertTrue(visitIds.contains(902));
+    }
+
+    @Test
+    public void shouldReturnEmptyListWhenNoUuidsGivenForBulkVisitLookup() throws Exception {
+        assertEquals(0, visitDao.getVisitsByUuids(new java.util.ArrayList<>()).size());
     }
 }

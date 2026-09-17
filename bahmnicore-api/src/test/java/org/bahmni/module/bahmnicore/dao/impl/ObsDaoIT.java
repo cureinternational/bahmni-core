@@ -123,6 +123,19 @@ public class ObsDaoIT extends BaseIntegrationTest {
     }
 
     @Test
+    public void shouldRetrieveObsAcrossMultipleVisitsInOneBulkCallByConcept() throws Exception {
+        List<Obs> allObs = obsDao.getObsByConceptAndVisits("Blood Pressure", Arrays.asList(901, 1), ObsDaoImpl.OrderBy.ASC, null, false);
+        assertEquals(1, allObs.size());
+        assertEquals("Blood Pressure", allObs.get(0).getConcept().getName().getName());
+    }
+
+    @Test
+    public void shouldReturnEmptyListWhenNoVisitIdsGivenForBulkConceptLookup() throws Exception {
+        List<Obs> allObs = obsDao.getObsByConceptAndVisits("Blood Pressure", new ArrayList<Integer>(), ObsDaoImpl.OrderBy.ASC, null, false);
+        assertEquals(0, allObs.size());
+    }
+
+    @Test
     public void shouldRetrieveObservationsFromGivenStartDate() throws Exception {
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-M-dd hh:mm:ss");
         Date startDate = dateFormat.parse("2008-08-17 15:09:05");

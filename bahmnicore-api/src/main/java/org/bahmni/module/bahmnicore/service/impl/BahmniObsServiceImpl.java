@@ -180,6 +180,78 @@ public class BahmniObsServiceImpl implements BahmniObsService {
     }
 
     @Override
+    public Map<String, Collection<BahmniObservation>> getObsByVisitsAndConcepts(List<Visit> visits, List<Concept> concepts, List<String> conceptNames,
+                                                                                 List<String> obsIgnoreList, Boolean filterObsWithOrders, String scope) {
+        Map<String, Collection<BahmniObservation>> observationsByVisitUuid = new HashMap<>();
+        if (CollectionUtils.isEmpty(visits)) {
+            return observationsByVisitUuid;
+        }
+
+        Map<Integer, Visit> visitsByVisitId = new HashMap<>();
+        List<Integer> visitIds = new ArrayList<>();
+        for (Visit visit : visits) {
+            visitsByVisitId.put(visit.getVisitId(), visit);
+            visitIds.add(visit.getVisitId());
+            observationsByVisitUuid.put(visit.getUuid(), new ArrayList<>());
+        }
+
+        if (CollectionUtils.isEmpty(concepts)) {
+            return observationsByVisitUuid;
+        }
+
+        if ("initial".equalsIgnoreCase(scope) || "latest".equalsIgnoreCase(scope)) {
+            ObsDaoImpl.OrderBy sortOrder = "initial".equalsIgnoreCase(scope) ? ObsDaoImpl.OrderBy.ASC : ObsDaoImpl.OrderBy.DESC;
+            Map<Integer, List<Obs>> obsByVisitId = new HashMap<>();
+            for (Integer visitId : visitIds) {
+                obsByVisitId.put(visitId, new ArrayList<>());
+            }
+
+            for (Concept concept : concepts) {
+                List<Obs> obsForConcept = obsDao.getObsByConceptAndVisits(concept.getName().getName(), visitIds, sortOrder, obsIgnoreList, filterObsWithOrders);
+                Set<Integer> visitsSeenForThisConcept = new HashSet<>();
+                for (Obs obs : obsForConcept) {
+                    Integer visitId = obs.getEncounter().getVisit().getVisitId();
+                    if (obsByVisitId.containsKey(visitId) && visitsSeenForThisConcept.add(visitId)) {
+                        obsByVisitId.get(visitId).add(obs);
+                    }
+                }
+            }
+
+            for (Visit visit : visits) {
+                List<Obs> obsForVisit = obsByVisitId.get(visit.getVisitId());
+                observationsByVisitUuid.put(visit.getUuid(), omrsObsToBahmniObsMapper.map(filterIgnoredObs(obsIgnoreList, obsForVisit), concepts));
+            }
+        } else {
+            List<Person> persons = new ArrayList<>();
+            ArrayList<Encounter> encounters = new ArrayList<>();
+            for (Visit visit : visits) {
+                persons.add(visit.getPatient());
+                encounters.addAll(visit.getEncounters());
+            }
+            Collection<Concept> obsIgnoreConcepts = MiscUtils.getConceptsForNames(obsIgnoreList, conceptService);
+            List<Obs> allObs = obsDao.getObsForVisits(persons, encounters, concepts, obsIgnoreConcepts, filterObsWithOrders, null);
+
+            Map<Integer, List<Obs>> obsByVisitId = new HashMap<>();
+            for (Integer visitId : visitIds) {
+                obsByVisitId.put(visitId, new ArrayList<>());
+            }
+            for (Obs obs : allObs) {
+                Integer visitId = obs.getEncounter().getVisit().getVisitId();
+                if (obsByVisitId.containsKey(visitId)) {
+                    obsByVisitId.get(visitId).add(obs);
+                }
+            }
+
+            for (Visit visit : visits) {
+                List<Obs> topLevelObs = new ArrayList<>(getObsAtTopLevelAndApplyIgnoreList(obsByVisitId.get(visit.getVisitId()), conceptNames, obsIgnoreConcepts));
+                observationsByVisitUuid.put(visit.getUuid(), omrsObsToBahmniObsMapper.map(topLevelObs, null));
+            }
+        }
+
+        return observationsByVisitUuid;
+    }
+
+    @Override
     public Collection<BahmniObservation> getInitial(String patientUuid, Collection<Concept> conceptNames,
                                                     Integer numberOfVisits, List<String> obsIgnoreList, Boolean filterOutOrderObs, Order order) {
         List<Obs> latestObs = new ArrayList<>();

@@ -9,6 +9,7 @@ import org.openmrs.module.bahmniemrapi.encountertransaction.contract.BahmniObser
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 public interface BahmniObsService {
     public List<Concept> getNumericConceptsForPerson(String personUUID);
@@ -19,6 +20,8 @@ public interface BahmniObsService {
     public Collection<BahmniObservation> getLatest(String patientUuid, Collection<Concept> conceptNames, Integer numberOfVisits, List<String> obsIgnoreList, Boolean filterOutOrderObs, Order order);
     public Collection<BahmniObservation> getLatestObsForConceptSetByVisit(String patientUuid, String conceptName, Integer visitId);
     public Collection<BahmniObservation> getLatestObsByVisit(Visit visit, Collection<Concept> concepts, List<String> obsIgnoreList, Boolean filterObsWithOrders);
+
+    Map<String, Collection<BahmniObservation>> getObsByVisitsAndConcepts(List<Visit> visits, List<Concept> concepts, List<String> conceptNames, List<String> obsIgnoreList, Boolean filterObsWithOrders, String scope);
 
     public Collection<BahmniObservation> getObservationsForOrder(String orderUuid);
 
