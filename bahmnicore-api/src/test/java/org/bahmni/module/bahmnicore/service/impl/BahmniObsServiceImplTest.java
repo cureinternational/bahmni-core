@@ -379,6 +379,31 @@ public class BahmniObsServiceImplTest {
     }
 
     @Test
+    public void getObsByVisitsAndConcepts_shouldReturnAllObsForDefaultScopeWhenNoConceptFilterGiven() {
+        Visit visit = new Visit(1);
+        visit.setUuid("visit-1");
+        visit.setPatient(new Patient(new Person(1)));
+        visit.setEncounters(new HashSet<Encounter>());
+
+        Obs someObs = mock(Obs.class);
+        Encounter encounter = mock(Encounter.class);
+        when(someObs.getEncounter()).thenReturn(encounter);
+        when(encounter.getVisit()).thenReturn(visit);
+        BahmniObservation mappedObs = mock(BahmniObservation.class);
+        when(omrsObsToBahmniObsMapper.map(any(List.class), (Collection<Concept>) org.mockito.Matchers.isNull()))
+                .thenReturn(singletonList(mappedObs));
+
+        when(obsDao.getObsForVisits(any(List.class), any(ArrayList.class), eq(new ArrayList<Concept>()), any(Collection.class), eq(true), isNull(Order.class)))
+                .thenReturn(asList(someObs));
+
+        Map<String, Collection<BahmniObservation>> result =
+                bahmniObsService.getObsByVisitsAndConcepts(asList(visit), new ArrayList<Concept>(), null, null, true, null);
+
+        verify(obsDao, times(1)).getObsForVisits(any(List.class), any(ArrayList.class), eq(new ArrayList<Concept>()), any(Collection.class), eq(true), isNull(Order.class));
+        assertEquals(1, result.get("visit-1").size());
+    }
+
+    @Test
     public void getObsByVisitsAndConcepts_shouldReturnEmptyMapWhenNoVisitsGiven() {
         Map<String, Collection<BahmniObservation>> result =
                 bahmniObsService.getObsByVisitsAndConcepts(new ArrayList<Visit>(), asList(new ConceptBuilder().withName("Weight").build()), null, null, true, "latest");

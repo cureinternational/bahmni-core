@@ -187,19 +187,16 @@ public class BahmniObsServiceImpl implements BahmniObsService {
             return observationsByVisitUuid;
         }
 
-        Map<Integer, Visit> visitsByVisitId = new HashMap<>();
         List<Integer> visitIds = new ArrayList<>();
         for (Visit visit : visits) {
-            visitsByVisitId.put(visit.getVisitId(), visit);
             visitIds.add(visit.getVisitId());
             observationsByVisitUuid.put(visit.getUuid(), new ArrayList<>());
         }
 
-        if (CollectionUtils.isEmpty(concepts)) {
-            return observationsByVisitUuid;
-        }
-
         if ("initial".equalsIgnoreCase(scope) || "latest".equalsIgnoreCase(scope)) {
+            if (CollectionUtils.isEmpty(concepts)) {
+                return observationsByVisitUuid;
+            }
             ObsDaoImpl.OrderBy sortOrder = "initial".equalsIgnoreCase(scope) ? ObsDaoImpl.OrderBy.ASC : ObsDaoImpl.OrderBy.DESC;
             Map<Integer, List<Obs>> obsByVisitId = new HashMap<>();
             for (Integer visitId : visitIds) {

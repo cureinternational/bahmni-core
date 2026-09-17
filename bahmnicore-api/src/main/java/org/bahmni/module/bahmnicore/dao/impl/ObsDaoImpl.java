@@ -111,11 +111,7 @@ public class ObsDaoImpl implements ObsDao {
             query.append(" order by obs.obsDatetime desc ");
         }
 
-        List<Locale> localeList = new ArrayList<>();
-        localeList.add(Context.getLocale());
-        if (!LocaleUtility.getDefaultLocale().equals(Context.getLocale())) {
-            localeList.add(LocaleUtility.getDefaultLocale());
-        }
+        List<Locale> localeList = getConceptNameLocales();
 
         Query queryToGetObservations = sessionFactory.getCurrentSession().createQuery(query.toString());
         queryToGetObservations.setMaxResults(limit);
@@ -139,6 +135,15 @@ public class ObsDaoImpl implements ObsDao {
             queryToGetObservations.setParameter("endDate", endDate);
         }
         return queryToGetObservations.list();
+    }
+
+    private List<Locale> getConceptNameLocales() {
+        List<Locale> localeList = new ArrayList<>();
+        localeList.add(Context.getLocale());
+        if (!LocaleUtility.getDefaultLocale().equals(Context.getLocale())) {
+            localeList.add(LocaleUtility.getDefaultLocale());
+        }
+        return localeList;
     }
 
     @Override
@@ -167,11 +172,7 @@ public class ObsDaoImpl implements ObsDao {
             query.append(" order by obs.obsDatetime desc ");
         }
 
-        List<Locale> localeList = new ArrayList<>();
-        localeList.add(Context.getLocale());
-        if (!LocaleUtility.getDefaultLocale().equals(Context.getLocale())) {
-            localeList.add(LocaleUtility.getDefaultLocale());
-        }
+        List<Locale> localeList = getConceptNameLocales();
 
         Query queryToGetObservations = sessionFactory.getCurrentSession().createQuery(query.toString());
         queryToGetObservations.setString("conceptName", conceptName);

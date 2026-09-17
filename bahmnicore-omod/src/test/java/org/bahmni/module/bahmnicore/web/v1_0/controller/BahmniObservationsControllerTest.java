@@ -1,5 +1,6 @@
 package org.bahmni.module.bahmnicore.web.v1_0.controller;
 
+import org.bahmni.module.bahmnicore.dao.BahmniConceptDao;
 import org.bahmni.module.bahmnicore.dao.VisitDao;
 import org.bahmni.module.bahmnicore.extensions.BahmniExtensions;
 import org.bahmni.module.bahmnicore.service.BahmniObsService;
@@ -50,6 +51,8 @@ public class BahmniObservationsControllerTest {
     @Mock
     private VisitDao visitDao;
     @Mock
+    private BahmniConceptDao bahmniConceptDao;
+    @Mock
     private BahmniExtensions bahmniExtensions;
 
     private Visit visit;
@@ -61,7 +64,7 @@ public class BahmniObservationsControllerTest {
         MockitoAnnotations.initMocks(this);
         visit = new VisitBuilder().withUUID("visitId").build();
         concept = new Concept();
-        bahmniObservationsController = new BahmniObservationsController(bahmniObsService, conceptService, visitService, visitDao, bahmniExtensions);
+        bahmniObservationsController = new BahmniObservationsController(bahmniObsService, conceptService, visitService, visitDao, bahmniConceptDao, bahmniExtensions);
         when(visitService.getVisitByUuid("visitId")).thenReturn(visit);
         when(visitDao.getVisitsByUuids(Arrays.asList("visitId"))).thenReturn(Arrays.asList(visit));
         when(conceptService.getConceptByName("Weight")).thenReturn(concept);
@@ -234,6 +237,55 @@ public class BahmniObservationsControllerTest {
         assertEquals(1, responses.get(0).getObservations().size());
         verify(bahmniObsService, times(1)).getObsByVisitsAndConcepts(Arrays.asList(visit), Arrays.asList(concept), Arrays.asList("Weight"), null, true, "latest");
         verify(conceptService, times(1)).getConceptByName("Weight");
+    }
+
+    @Test
+    public void getBatch_shouldNotCallPerNameLookupWhenBulkConceptResolutionFindsEverything() throws Exception {
+        Concept mockedWeight = mockConceptNamed("Weight");
+        Concept mockedPulse = mockConceptNamed("Pulse");
+        when(bahmniConceptDao.getConceptsByFullySpecifiedName(Arrays.asList("Weight", "Pulse")))
+                .thenReturn(Arrays.asList(mockedWeight, mockedPulse));
+        when(bahmniObsService.getObsByVisitsAndConcepts(Arrays.asList(visit), Arrays.asList(mockedWeight, mockedPulse), Arrays.asList("Weight", "Pulse"), null, true, null))
+                .thenReturn(new HashMap<>());
+
+        BahmniObservationsBatchRequest request = new BahmniObservationsBatchRequest();
+        request.setVisitUuids(Arrays.asList("visitId"));
+        request.setConcept(Arrays.asList("Weight", "Pulse"));
+
+        bahmniObservationsController.getBatch(request);
+
+        verify(bahmniConceptDao, times(1)).getConceptsByFullySpecifiedName(Arrays.asList("Weight", "Pulse"));
+        verify(conceptService, never()).getConceptByName(anyString());
+        verify(bahmniObsService, times(1)).getObsByVisitsAndConcepts(Arrays.asList(visit), Arrays.asList(mockedWeight, mockedPulse), Arrays.asList("Weight", "Pulse"), null, true, null);
+    }
+
+    @Test
+    public void getBatch_shouldFallBackToPerNameLookupOnlyForNamesBulkResolutionMissed() throws Exception {
+        Concept mockedWeight = mockConceptNamed("Weight");
+        when(bahmniConceptDao.getConceptsByFullySpecifiedName(Arrays.asList("Weight", "Pulse")))
+                .thenReturn(Arrays.asList(mockedWeight));
+        Concept pulse = new Concept();
+        when(conceptService.getConceptByName("Pulse")).thenReturn(pulse);
+        when(bahmniObsService.getObsByVisitsAndConcepts(Arrays.asList(visit), Arrays.asList(mockedWeight, pulse), Arrays.asList("Weight", "Pulse"), null, true, null))
+                .thenReturn(new HashMap<>());
+
+        BahmniObservationsBatchRequest request = new BahmniObservationsBatchRequest();
+        request.setVisitUuids(Arrays.asList("visitId"));
+        request.setConcept(Arrays.asList("Weight", "Pulse"));
+
+        bahmniObservationsController.getBatch(request);
+
+        verify(conceptService, never()).getConceptByName("Weight");
+        verify(conceptService, times(1)).getConceptByName("Pulse");
+        verify(bahmniObsService, times(1)).getObsByVisitsAndConcepts(Arrays.asList(visit), Arrays.asList(mockedWeight, pulse), Arrays.asList("Weight", "Pulse"), null, true, null);
+    }
+
+    private Concept mockConceptNamed(String name) {
+        Concept mockedConcept = org.mockito.Mockito.mock(Concept.class);
+        org.openmrs.ConceptName mockedConceptName = org.mockito.Mockito.mock(org.openmrs.ConceptName.class);
+        when(mockedConceptName.getName()).thenReturn(name);
+        when(mockedConcept.getName()).thenReturn(mockedConceptName);
+        return mockedConcept;
     }
 
     @Test
