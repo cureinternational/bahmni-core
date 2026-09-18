@@ -111,11 +111,7 @@ public class ObsDaoImpl implements ObsDao {
             query.append(" order by obs.obsDatetime desc ");
         }
 
-        List<Locale> localeList = new ArrayList<>();
-        localeList.add(Context.getLocale());
-        if (!LocaleUtility.getDefaultLocale().equals(Context.getLocale())) {
-            localeList.add(LocaleUtility.getDefaultLocale());
-        }
+        List<Locale> localeList = getLocaleList();
 
         Query queryToGetObservations = sessionFactory.getCurrentSession().createQuery(query.toString());
         queryToGetObservations.setMaxResults(limit);
@@ -137,6 +133,54 @@ public class ObsDaoImpl implements ObsDao {
         }
         if (endDate != null) {
             queryToGetObservations.setParameter("endDate", endDate);
+        }
+        return queryToGetObservations.list();
+    }
+
+    private List<Locale> getLocaleList() {
+        List<Locale> localeList = new ArrayList<>();
+        localeList.add(Context.getLocale());
+        if (!LocaleUtility.getDefaultLocale().equals(Context.getLocale())) {
+            localeList.add(LocaleUtility.getDefaultLocale());
+        }
+        return localeList;
+    }
+
+    @Override
+    public List<Obs> getObsByConceptsAndVisits(List<String> conceptNames, List<Integer> listOfVisitIds, OrderBy sortOrder, List<String> obsIgnoreList, Boolean filterOutOrderObs) {
+        if (CollectionUtils.isEmpty(listOfVisitIds) || CollectionUtils.isEmpty(conceptNames)) {
+            return new ArrayList<>();
+        }
+
+        StringBuilder query = new StringBuilder("select obs from Obs as obs, ConceptName as cn " +
+                " where cn.concept = obs.concept.conceptId " +
+                " and cn.name in (:conceptNames) " +
+                " and cn.locale in (:locale) " +
+                " and cn.conceptNameType = :conceptNameType " +
+                " and cn.voided = false and obs.voided = false " +
+                " and obs.encounter.visit.visitId in (:listOfVisitIds) ");
+
+        if (CollectionUtils.isNotEmpty(obsIgnoreList)) {
+            query.append(" and cn.name not in (:obsIgnoreList) ");
+        }
+        if (filterOutOrderObs) {
+            query.append(" and obs.order.orderId is null ");
+        }
+        if (sortOrder == OrderBy.ASC) {
+            query.append(" order by obs.obsDatetime asc ");
+        } else {
+            query.append(" order by obs.obsDatetime desc ");
+        }
+
+        List<Locale> localeList = getLocaleList();
+
+        Query queryToGetObservations = sessionFactory.getCurrentSession().createQuery(query.toString());
+        queryToGetObservations.setParameterList("conceptNames", conceptNames);
+        queryToGetObservations.setParameter("conceptNameType", ConceptNameType.FULLY_SPECIFIED);
+        queryToGetObservations.setParameterList("locale", localeList);
+        queryToGetObservations.setParameterList("listOfVisitIds", listOfVisitIds);
+        if (CollectionUtils.isNotEmpty(obsIgnoreList)) {
+            queryToGetObservations.setParameterList("obsIgnoreList", obsIgnoreList);
         }
         return queryToGetObservations.list();
     }

@@ -82,4 +82,15 @@ public class VisitDaoImpl implements VisitDao {
         }
         return queryToGetVisitIds.list();
     }
+
+    @Override
+    public List<Visit> getVisitsByUuids(List<String> visitUuids) {
+        if (visitUuids == null || visitUuids.isEmpty()) {
+            return new ArrayList<>();
+        }
+        Query query = sessionFactory.getCurrentSession().createQuery(
+                "select distinct v from Visit v left join fetch v.encounters where v.uuid in (:visitUuids)");
+        query.setParameterList("visitUuids", visitUuids);
+        return query.list();
+    }
 }

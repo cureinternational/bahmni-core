@@ -35,6 +35,7 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -98,16 +99,11 @@ public class BahmniObservationsController extends BaseRestController {
             return responses;
         }
 
+        Map<String, Collection<BahmniObservation>> observationsByVisitUuid =
+                bahmniObsService.getObsByVisitsAndConcepts(request.getVisitUuids(), conceptNames, obsIgnoreList, filterObsWithOrders, scope);
+
         for (String visitUuid : request.getVisitUuids()) {
-            Visit visit = visitService.getVisitByUuid(visitUuid);
-            Collection<BahmniObservation> observations;
-            if (INITIAL.equalsIgnoreCase(scope)) {
-                observations = bahmniObsService.getInitialObsByVisit(visit, MiscUtils.getConceptsForNames(conceptNames, conceptService), obsIgnoreList, filterObsWithOrders);
-            } else if (LATEST.equalsIgnoreCase(scope)) {
-                observations = bahmniObsService.getLatestObsByVisit(visit, MiscUtils.getConceptsForNames(conceptNames, conceptService), obsIgnoreList, filterObsWithOrders);
-            } else {
-                observations = bahmniObsService.getObservationForVisit(visitUuid, conceptNames, MiscUtils.getConceptsForNames(obsIgnoreList, conceptService), filterObsWithOrders, null);
-            }
+            Collection<BahmniObservation> observations = observationsByVisitUuid.getOrDefault(visitUuid, Collections.emptyList());
             responses.add(new VisitObservationsResponse(visitUuid, observations));
         }
         return responses;
