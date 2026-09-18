@@ -185,79 +185,117 @@ public class BahmniObsServiceImpl implements BahmniObsService {
     @Override
     public Map<String, Collection<BahmniObservation>> getObsByVisitsAndConcepts(List<String> visitUuids, List<String> conceptNames,
                                                                                  List<String> obsIgnoreList, Boolean filterObsWithOrders, String scope) {
-        Map<String, Collection<BahmniObservation>> observationsByVisitUuid = new HashMap<>();
         if (CollectionUtils.isEmpty(visitUuids)) {
-            return observationsByVisitUuid;
+            return new HashMap<>();
         }
 
         List<Visit> visits = visitDao.getVisitsByUuids(visitUuids);
         if (CollectionUtils.isEmpty(visits)) {
+            return new HashMap<>();
+        }
+
+        List<Concept> concepts = resolveConceptsForBatch(conceptNames);
+        List<Integer> visitIds = getVisitIds(visits);
+
+        if ("initial".equalsIgnoreCase(scope) || "latest".equalsIgnoreCase(scope)) {
+            return getInitialOrLatestObsByVisits(visits, visitIds, concepts, obsIgnoreList, filterObsWithOrders, scope);
+        }
+        return getAllObsByVisits(visits, visitIds, concepts, conceptNames, obsIgnoreList, filterObsWithOrders);
+    }
+
+    private Map<String, Collection<BahmniObservation>> getInitialOrLatestObsByVisits(List<Visit> visits, List<Integer> visitIds, List<Concept> concepts,
+                                                                                       List<String> obsIgnoreList, Boolean filterObsWithOrders, String scope) {
+        Map<String, Collection<BahmniObservation>> observationsByVisitUuid = initializeEmptyResultPerVisit(visits);
+        if (CollectionUtils.isEmpty(concepts)) {
             return observationsByVisitUuid;
         }
-        List<Concept> concepts = resolveConceptsForBatch(conceptNames);
 
+        ObsDaoImpl.OrderBy sortOrder = "initial".equalsIgnoreCase(scope) ? ObsDaoImpl.OrderBy.ASC : ObsDaoImpl.OrderBy.DESC;
+        List<Obs> obsForConcepts = obsDao.getObsByConceptsAndVisits(getConceptNamesForQuery(concepts), visitIds, sortOrder, obsIgnoreList, filterObsWithOrders);
+        Map<Integer, List<Obs>> obsByVisitId = groupLatestObsPerVisitAndConcept(obsForConcepts, visitIds);
+
+        for (Visit visit : visits) {
+            List<Obs> obsForVisit = obsByVisitId.get(visit.getVisitId());
+            observationsByVisitUuid.put(visit.getUuid(), omrsObsToBahmniObsMapper.map(filterIgnoredObs(obsIgnoreList, obsForVisit), concepts));
+        }
+        return observationsByVisitUuid;
+    }
+
+    private Map<Integer, List<Obs>> groupLatestObsPerVisitAndConcept(List<Obs> obsForConcepts, List<Integer> visitIds) {
+        Map<Integer, List<Obs>> obsByVisitId = initializeEmptyObsListPerVisitId(visitIds);
+        Set<String> visitConceptSeen = new HashSet<>();
+        for (Obs obs : obsForConcepts) {
+            Integer visitId = obs.getEncounter().getVisit().getVisitId();
+            String visitAndConceptId = visitId + "-" + obs.getConcept().getConceptId();
+            if (obsByVisitId.containsKey(visitId) && visitConceptSeen.add(visitAndConceptId)) {
+                obsByVisitId.get(visitId).add(obs);
+            }
+        }
+        return obsByVisitId;
+    }
+
+    private Map<String, Collection<BahmniObservation>> getAllObsByVisits(List<Visit> visits, List<Integer> visitIds, List<Concept> concepts, List<String> conceptNames,
+                                                                          List<String> obsIgnoreList, Boolean filterObsWithOrders) {
+        Map<String, Collection<BahmniObservation>> observationsByVisitUuid = initializeEmptyResultPerVisit(visits);
+
+        List<Person> persons = new ArrayList<>();
+        ArrayList<Encounter> encounters = new ArrayList<>();
+        for (Visit visit : visits) {
+            persons.add(visit.getPatient());
+            encounters.addAll(visit.getEncounters());
+        }
+        Collection<Concept> obsIgnoreConcepts = MiscUtils.getConceptsForNames(obsIgnoreList, conceptService);
+        List<Obs> allObs = obsDao.getObsForVisits(persons, encounters, concepts, obsIgnoreConcepts, filterObsWithOrders, null);
+        Map<Integer, List<Obs>> obsByVisitId = groupObsByVisitId(allObs, visitIds);
+
+        for (Visit visit : visits) {
+            List<Obs> topLevelObs = new ArrayList<>(getObsAtTopLevelAndApplyIgnoreList(obsByVisitId.get(visit.getVisitId()), conceptNames, obsIgnoreConcepts));
+            observationsByVisitUuid.put(visit.getUuid(), omrsObsToBahmniObsMapper.map(topLevelObs, null));
+        }
+        return observationsByVisitUuid;
+    }
+
+    private Map<Integer, List<Obs>> groupObsByVisitId(List<Obs> allObs, List<Integer> visitIds) {
+        Map<Integer, List<Obs>> obsByVisitId = initializeEmptyObsListPerVisitId(visitIds);
+        for (Obs obs : allObs) {
+            Integer visitId = obs.getEncounter().getVisit().getVisitId();
+            if (obsByVisitId.containsKey(visitId)) {
+                obsByVisitId.get(visitId).add(obs);
+            }
+        }
+        return obsByVisitId;
+    }
+
+    private Map<String, Collection<BahmniObservation>> initializeEmptyResultPerVisit(List<Visit> visits) {
+        Map<String, Collection<BahmniObservation>> observationsByVisitUuid = new HashMap<>();
+        for (Visit visit : visits) {
+            observationsByVisitUuid.put(visit.getUuid(), new ArrayList<>());
+        }
+        return observationsByVisitUuid;
+    }
+
+    private Map<Integer, List<Obs>> initializeEmptyObsListPerVisitId(List<Integer> visitIds) {
+        Map<Integer, List<Obs>> obsByVisitId = new HashMap<>();
+        for (Integer visitId : visitIds) {
+            obsByVisitId.put(visitId, new ArrayList<>());
+        }
+        return obsByVisitId;
+    }
+
+    private List<Integer> getVisitIds(List<Visit> visits) {
         List<Integer> visitIds = new ArrayList<>();
         for (Visit visit : visits) {
             visitIds.add(visit.getVisitId());
-            observationsByVisitUuid.put(visit.getUuid(), new ArrayList<>());
         }
+        return visitIds;
+    }
 
-        if ("initial".equalsIgnoreCase(scope) || "latest".equalsIgnoreCase(scope)) {
-            if (CollectionUtils.isEmpty(concepts)) {
-                return observationsByVisitUuid;
-            }
-            ObsDaoImpl.OrderBy sortOrder = "initial".equalsIgnoreCase(scope) ? ObsDaoImpl.OrderBy.ASC : ObsDaoImpl.OrderBy.DESC;
-            Map<Integer, List<Obs>> obsByVisitId = new HashMap<>();
-            for (Integer visitId : visitIds) {
-                obsByVisitId.put(visitId, new ArrayList<>());
-            }
-
-            List<String> conceptNamesForQuery = new ArrayList<>();
-            for (Concept concept : concepts) {
-                conceptNamesForQuery.add(concept.getName().getName());
-            }
-            List<Obs> obsForConcepts = obsDao.getObsByConceptsAndVisits(conceptNamesForQuery, visitIds, sortOrder, obsIgnoreList, filterObsWithOrders);
-            Set<String> visitConceptSeen = new HashSet<>();
-            for (Obs obs : obsForConcepts) {
-                Integer visitId = obs.getEncounter().getVisit().getVisitId();
-                String visitAndConceptId = visitId + "-" + obs.getConcept().getConceptId();
-                if (obsByVisitId.containsKey(visitId) && visitConceptSeen.add(visitAndConceptId)) {
-                    obsByVisitId.get(visitId).add(obs);
-                }
-            }
-
-            for (Visit visit : visits) {
-                List<Obs> obsForVisit = obsByVisitId.get(visit.getVisitId());
-                observationsByVisitUuid.put(visit.getUuid(), omrsObsToBahmniObsMapper.map(filterIgnoredObs(obsIgnoreList, obsForVisit), concepts));
-            }
-        } else {
-            List<Person> persons = new ArrayList<>();
-            ArrayList<Encounter> encounters = new ArrayList<>();
-            for (Visit visit : visits) {
-                persons.add(visit.getPatient());
-                encounters.addAll(visit.getEncounters());
-            }
-            Collection<Concept> obsIgnoreConcepts = MiscUtils.getConceptsForNames(obsIgnoreList, conceptService);
-            List<Obs> allObs = obsDao.getObsForVisits(persons, encounters, concepts, obsIgnoreConcepts, filterObsWithOrders, null);
-
-            Map<Integer, List<Obs>> obsByVisitId = new HashMap<>();
-            for (Integer visitId : visitIds) {
-                obsByVisitId.put(visitId, new ArrayList<>());
-            }
-            for (Obs obs : allObs) {
-                Integer visitId = obs.getEncounter().getVisit().getVisitId();
-                if (obsByVisitId.containsKey(visitId)) {
-                    obsByVisitId.get(visitId).add(obs);
-                }
-            }
-
-            for (Visit visit : visits) {
-                List<Obs> topLevelObs = new ArrayList<>(getObsAtTopLevelAndApplyIgnoreList(obsByVisitId.get(visit.getVisitId()), conceptNames, obsIgnoreConcepts));
-                observationsByVisitUuid.put(visit.getUuid(), omrsObsToBahmniObsMapper.map(topLevelObs, null));
-            }
+    private List<String> getConceptNamesForQuery(List<Concept> concepts) {
+        List<String> conceptNamesForQuery = new ArrayList<>();
+        for (Concept concept : concepts) {
+            conceptNamesForQuery.add(concept.getName().getName());
         }
-
-        return observationsByVisitUuid;
+        return conceptNamesForQuery;
     }
 
     private List<Concept> resolveConceptsForBatch(List<String> conceptNames) {
