@@ -89,7 +89,7 @@ public class VisitDaoImpl implements VisitDao {
             return new ArrayList<>();
         }
         Query query = sessionFactory.getCurrentSession().createQuery(
-                "select v from Visit v where v.uuid in (:visitUuids)");
+                "select distinct v from Visit v left join fetch v.encounters where v.uuid in (:visitUuids)");
         query.setParameterList("visitUuids", visitUuids);
         return query.list();
     }

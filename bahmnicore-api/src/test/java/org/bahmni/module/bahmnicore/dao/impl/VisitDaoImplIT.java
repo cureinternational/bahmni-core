@@ -3,6 +3,7 @@ package org.bahmni.module.bahmnicore.dao.impl;
 import org.bahmni.module.bahmnicore.BaseIntegrationTest;
 import org.bahmni.module.bahmnicommons.api.dao.PatientDao;
 import org.bahmni.module.bahmnicore.dao.VisitDao;
+import org.hibernate.SessionFactory;
 import org.junit.Before;
 import org.junit.Test;
 import org.openmrs.Encounter;
@@ -23,6 +24,9 @@ public class VisitDaoImplIT extends BaseIntegrationTest {
 
     @Autowired
     PatientDao patientDao;
+
+    @Autowired
+    SessionFactory sessionFactory;
 
     @Before
     public void setUp() throws Exception {
@@ -58,6 +62,26 @@ public class VisitDaoImplIT extends BaseIntegrationTest {
         List<Integer> visitIds = Arrays.asList(visits.get(0).getVisitId(), visits.get(1).getVisitId());
         assertTrue(visitIds.contains(901));
         assertTrue(visitIds.contains(902));
+    }
+
+    @Test
+    public void shouldFetchEncountersEagerlyWithoutOneExtraQueryPerVisit() throws Exception {
+        List<String> visitUuids = Arrays.asList(
+                "ad41fb41-a41a-4ad6-8835-2f59099acf5t", "ad41fb41-a41a-4ad6-8835-2f59099acf5b");
+
+        sessionFactory.getStatistics().setStatisticsEnabled(true);
+        sessionFactory.getStatistics().clear();
+
+        List<Visit> visits = visitDao.getVisitsByUuids(visitUuids);
+        for (Visit visit : visits) {
+            visit.getEncounters().size();
+        }
+
+        long queryCount = sessionFactory.getStatistics().getQueryExecutionCount();
+
+        assertEquals("visits + encounters should come back in one fetch-joined query, not one extra query per visit",
+                1, queryCount);
+        assertEquals(2, visits.size());
     }
 
     @Test

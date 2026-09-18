@@ -327,6 +327,26 @@ public class BahmniObsServiceImplTest {
     }
 
     @Test
+    public void getObsByVisitsAndConcepts_shouldTreatScopeCaseInsensitively() {
+        Visit visit = new Visit(1);
+        visit.setUuid("visit-1");
+        Concept weight = new ConceptBuilder().withName("Weight").build();
+
+        when(visitDao.getVisitsByUuids(asList("visit-1"))).thenReturn(asList(visit));
+        when(bahmniConceptDao.getConceptsByFullySpecifiedName(asList("Weight"))).thenReturn(asList(weight));
+        when(obsDao.getObsByConceptsAndVisits(anyList(), any(List.class), any(ObsDaoImpl.OrderBy.class), any(List.class), any(Boolean.class)))
+                .thenReturn(new ArrayList<Obs>());
+
+        bahmniObsService.getObsByVisitsAndConcepts(asList("visit-1"), asList("Weight"), null, true, "INITIAL");
+
+        verify(obsDao, times(1)).getObsByConceptsAndVisits(asList("Weight"), asList(1), ObsDaoImpl.OrderBy.ASC, null, true);
+
+        bahmniObsService.getObsByVisitsAndConcepts(asList("visit-1"), asList("Weight"), null, true, "LATEST");
+
+        verify(obsDao, times(1)).getObsByConceptsAndVisits(asList("Weight"), asList(1), ObsDaoImpl.OrderBy.DESC, null, true);
+    }
+
+    @Test
     public void getObsByVisitsAndConcepts_shouldGroupObsPerVisitForLatestScope() {
         Visit visit1 = new Visit(1);
         visit1.setUuid("visit1");
