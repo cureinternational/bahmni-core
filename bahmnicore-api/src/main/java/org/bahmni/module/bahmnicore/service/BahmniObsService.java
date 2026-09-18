@@ -21,7 +21,7 @@ public interface BahmniObsService {
     public Collection<BahmniObservation> getLatestObsForConceptSetByVisit(String patientUuid, String conceptName, Integer visitId);
     public Collection<BahmniObservation> getLatestObsByVisit(Visit visit, Collection<Concept> concepts, List<String> obsIgnoreList, Boolean filterObsWithOrders);
 
-    Map<String, Collection<BahmniObservation>> getObsByVisitsAndConcepts(List<Visit> visits, List<Concept> concepts, List<String> conceptNames, List<String> obsIgnoreList, Boolean filterObsWithOrders, String scope);
+    Map<String, Collection<BahmniObservation>> getObsByVisitsAndConcepts(List<String> visitUuids, List<String> conceptNames, List<String> obsIgnoreList, Boolean filterObsWithOrders, String scope);
 
     public Collection<BahmniObservation> getObservationsForOrder(String orderUuid);
 

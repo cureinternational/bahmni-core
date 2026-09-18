@@ -2,6 +2,7 @@ package org.bahmni.module.bahmnicore.service.impl;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.bahmni.module.bahmnicore.dao.BahmniConceptDao;
 import org.bahmni.module.bahmnicore.dao.ObsDao;
 import org.bahmni.module.bahmnicore.dao.VisitDao;
 import org.bahmni.module.bahmnicore.dao.impl.ObsDaoImpl;
@@ -32,6 +33,7 @@ public class BahmniObsServiceImpl implements BahmniObsService {
 
     private ObsDao obsDao;
     private VisitDao visitDao;
+    private BahmniConceptDao bahmniConceptDao;
     private OMRSObsToBahmniObsMapper omrsObsToBahmniObsMapper;
     private VisitService visitService;
     private ConceptService conceptService;
@@ -39,12 +41,13 @@ public class BahmniObsServiceImpl implements BahmniObsService {
     private ObsService obsService;
 
     @Autowired
-    public BahmniObsServiceImpl(ObsDao obsDao, OMRSObsToBahmniObsMapper omrsObsToBahmniObsMapper, VisitService visitService, ConceptService conceptService, VisitDao visitDao, BahmniProgramWorkflowService programWorkflowService, ObsService obsService) {
+    public BahmniObsServiceImpl(ObsDao obsDao, OMRSObsToBahmniObsMapper omrsObsToBahmniObsMapper, VisitService visitService, ConceptService conceptService, VisitDao visitDao, BahmniConceptDao bahmniConceptDao, BahmniProgramWorkflowService programWorkflowService, ObsService obsService) {
         this.obsDao = obsDao;
         this.omrsObsToBahmniObsMapper = omrsObsToBahmniObsMapper;
         this.visitService = visitService;
         this.conceptService = conceptService;
         this.visitDao = visitDao;
+        this.bahmniConceptDao = bahmniConceptDao;
         this.programWorkflowService = programWorkflowService;
         this.obsService = obsService;
     }
@@ -180,12 +183,18 @@ public class BahmniObsServiceImpl implements BahmniObsService {
     }
 
     @Override
-    public Map<String, Collection<BahmniObservation>> getObsByVisitsAndConcepts(List<Visit> visits, List<Concept> concepts, List<String> conceptNames,
+    public Map<String, Collection<BahmniObservation>> getObsByVisitsAndConcepts(List<String> visitUuids, List<String> conceptNames,
                                                                                  List<String> obsIgnoreList, Boolean filterObsWithOrders, String scope) {
         Map<String, Collection<BahmniObservation>> observationsByVisitUuid = new HashMap<>();
+        if (CollectionUtils.isEmpty(visitUuids)) {
+            return observationsByVisitUuid;
+        }
+
+        List<Visit> visits = visitDao.getVisitsByUuids(visitUuids);
         if (CollectionUtils.isEmpty(visits)) {
             return observationsByVisitUuid;
         }
+        List<Concept> concepts = resolveConceptsForBatch(conceptNames);
 
         List<Integer> visitIds = new ArrayList<>();
         for (Visit visit : visits) {
@@ -203,14 +212,17 @@ public class BahmniObsServiceImpl implements BahmniObsService {
                 obsByVisitId.put(visitId, new ArrayList<>());
             }
 
+            List<String> conceptNamesForQuery = new ArrayList<>();
             for (Concept concept : concepts) {
-                List<Obs> obsForConcept = obsDao.getObsByConceptAndVisits(concept.getName().getName(), visitIds, sortOrder, obsIgnoreList, filterObsWithOrders);
-                Set<Integer> visitsSeenForThisConcept = new HashSet<>();
-                for (Obs obs : obsForConcept) {
-                    Integer visitId = obs.getEncounter().getVisit().getVisitId();
-                    if (obsByVisitId.containsKey(visitId) && visitsSeenForThisConcept.add(visitId)) {
-                        obsByVisitId.get(visitId).add(obs);
-                    }
+                conceptNamesForQuery.add(concept.getName().getName());
+            }
+            List<Obs> obsForConcepts = obsDao.getObsByConceptsAndVisits(conceptNamesForQuery, visitIds, sortOrder, obsIgnoreList, filterObsWithOrders);
+            Set<String> visitConceptSeen = new HashSet<>();
+            for (Obs obs : obsForConcepts) {
+                Integer visitId = obs.getEncounter().getVisit().getVisitId();
+                String visitAndConceptId = visitId + "-" + obs.getConcept().getConceptId();
+                if (obsByVisitId.containsKey(visitId) && visitConceptSeen.add(visitAndConceptId)) {
+                    obsByVisitId.get(visitId).add(obs);
                 }
             }
 
@@ -246,6 +258,29 @@ public class BahmniObsServiceImpl implements BahmniObsService {
         }
 
         return observationsByVisitUuid;
+    }
+
+    private List<Concept> resolveConceptsForBatch(List<String> conceptNames) {
+        if (CollectionUtils.isEmpty(conceptNames)) {
+            return new ArrayList<>();
+        }
+
+        List<Concept> concepts = new ArrayList<>(bahmniConceptDao.getConceptsByFullySpecifiedName(conceptNames));
+
+        Set<String> resolvedNamesLowerCase = new HashSet<>();
+        for (Concept concept : concepts) {
+            resolvedNamesLowerCase.add(concept.getName().getName().toLowerCase());
+        }
+        List<String> unresolvedNames = new ArrayList<>();
+        for (String name : conceptNames) {
+            if (!resolvedNamesLowerCase.contains(name.toLowerCase())) {
+                unresolvedNames.add(name);
+            }
+        }
+        if (!unresolvedNames.isEmpty()) {
+            concepts.addAll(MiscUtils.getConceptsForNames(unresolvedNames, conceptService));
+        }
+        return concepts;
     }
 
     @Override

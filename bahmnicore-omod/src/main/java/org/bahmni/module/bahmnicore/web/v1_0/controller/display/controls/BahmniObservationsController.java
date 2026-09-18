@@ -2,8 +2,6 @@ package org.bahmni.module.bahmnicore.web.v1_0.controller.display.controls;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
-import org.bahmni.module.bahmnicore.dao.BahmniConceptDao;
-import org.bahmni.module.bahmnicore.dao.VisitDao;
 import org.bahmni.module.bahmnicore.extensions.BahmniExtensions;
 import org.bahmni.module.bahmnicore.obs.ObservationsAdder;
 import org.bahmni.module.bahmnicore.service.BahmniObsService;
@@ -34,7 +32,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -54,17 +51,13 @@ public class BahmniObservationsController extends BaseRestController {
     private BahmniObsService bahmniObsService;
     private ConceptService conceptService;
     private VisitService visitService;
-    private VisitDao visitDao;
-    private BahmniConceptDao bahmniConceptDao;
     private BahmniExtensions bahmniExtensions;
 
     @Autowired
-    public BahmniObservationsController(BahmniObsService bahmniObsService, ConceptService conceptService, VisitService visitService, VisitDao visitDao, BahmniConceptDao bahmniConceptDao, BahmniExtensions bahmniExtensions) {
+    public BahmniObservationsController(BahmniObsService bahmniObsService, ConceptService conceptService, VisitService visitService, BahmniExtensions bahmniExtensions) {
         this.bahmniObsService = bahmniObsService;
         this.conceptService = conceptService;
         this.visitService = visitService;
-        this.visitDao = visitDao;
-        this.bahmniConceptDao = bahmniConceptDao;
         this.bahmniExtensions = bahmniExtensions;
     }
 
@@ -106,40 +99,14 @@ public class BahmniObservationsController extends BaseRestController {
             return responses;
         }
 
-        List<Concept> concepts = resolveConceptsForBatch(conceptNames);
-        List<Visit> visits = visitDao.getVisitsByUuids(request.getVisitUuids());
-
         Map<String, Collection<BahmniObservation>> observationsByVisitUuid =
-                bahmniObsService.getObsByVisitsAndConcepts(visits, concepts, conceptNames, obsIgnoreList, filterObsWithOrders, scope);
+                bahmniObsService.getObsByVisitsAndConcepts(request.getVisitUuids(), conceptNames, obsIgnoreList, filterObsWithOrders, scope);
 
         for (String visitUuid : request.getVisitUuids()) {
             Collection<BahmniObservation> observations = observationsByVisitUuid.getOrDefault(visitUuid, Collections.emptyList());
             responses.add(new VisitObservationsResponse(visitUuid, observations));
         }
         return responses;
-    }
-
-    private List<Concept> resolveConceptsForBatch(List<String> conceptNames) {
-        if (CollectionUtils.isEmpty(conceptNames)) {
-            return new ArrayList<>();
-        }
-
-        List<Concept> concepts = new ArrayList<>(bahmniConceptDao.getConceptsByFullySpecifiedName(conceptNames));
-
-        Set<String> resolvedNamesLowerCase = new HashSet<>();
-        for (Concept concept : concepts) {
-            resolvedNamesLowerCase.add(concept.getName().getName().toLowerCase());
-        }
-        List<String> unresolvedNames = new ArrayList<>();
-        for (String name : conceptNames) {
-            if (!resolvedNamesLowerCase.contains(name.toLowerCase())) {
-                unresolvedNames.add(name);
-            }
-        }
-        if (!unresolvedNames.isEmpty()) {
-            concepts.addAll(MiscUtils.getConceptsForNames(unresolvedNames, conceptService));
-        }
-        return concepts;
     }
 
     private List<Concept> searchConceptsByName(List<String> conceptNames, Locale searchLocale) {

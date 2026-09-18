@@ -5,6 +5,7 @@ import org.bahmni.module.bahmnicore.dao.ObsDao;
 import org.junit.Before;
 import org.junit.Test;
 import org.openmrs.Obs;
+import org.openmrs.api.context.Context;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.text.SimpleDateFormat;
@@ -12,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 import static junit.framework.Assert.assertEquals;
 
@@ -21,6 +23,9 @@ public class ObsDaoIT extends BaseIntegrationTest {
 
     @Before
     public void setUp() throws Exception {
+        // Fixture concept names are stored under bare "en"; force it so cn.locale
+        // filtering matches regardless of the running machine's regional default locale.
+        Context.setLocale(new Locale("en"));
         executeDataSet("apiTestData.xml");
     }
 
@@ -124,14 +129,27 @@ public class ObsDaoIT extends BaseIntegrationTest {
 
     @Test
     public void shouldRetrieveObsAcrossMultipleVisitsInOneBulkCallByConcept() throws Exception {
-        List<Obs> allObs = obsDao.getObsByConceptAndVisits("Blood Pressure", Arrays.asList(901, 1), ObsDaoImpl.OrderBy.ASC, null, false);
+        List<Obs> allObs = obsDao.getObsByConceptsAndVisits(Arrays.asList("Blood Pressure"), Arrays.asList(901, 1), ObsDaoImpl.OrderBy.ASC, null, false);
         assertEquals(1, allObs.size());
         assertEquals("Blood Pressure", allObs.get(0).getConcept().getName().getName());
     }
 
     @Test
+    public void shouldRetrieveObsAcrossMultipleConceptsInOneBulkCall() throws Exception {
+        // visit 901 has a Blood Pressure obs and its own Diastolic obs; visit 111 has a separate Diastolic obs
+        List<Obs> allObs = obsDao.getObsByConceptsAndVisits(Arrays.asList("Blood Pressure", "Diastolic"), Arrays.asList(901, 111), ObsDaoImpl.OrderBy.ASC, null, false);
+        assertEquals(3, allObs.size());
+    }
+
+    @Test
     public void shouldReturnEmptyListWhenNoVisitIdsGivenForBulkConceptLookup() throws Exception {
-        List<Obs> allObs = obsDao.getObsByConceptAndVisits("Blood Pressure", new ArrayList<Integer>(), ObsDaoImpl.OrderBy.ASC, null, false);
+        List<Obs> allObs = obsDao.getObsByConceptsAndVisits(Arrays.asList("Blood Pressure"), new ArrayList<Integer>(), ObsDaoImpl.OrderBy.ASC, null, false);
+        assertEquals(0, allObs.size());
+    }
+
+    @Test
+    public void shouldReturnEmptyListWhenNoConceptNamesGivenForBulkConceptLookup() throws Exception {
+        List<Obs> allObs = obsDao.getObsByConceptsAndVisits(new ArrayList<String>(), Arrays.asList(901), ObsDaoImpl.OrderBy.ASC, null, false);
         assertEquals(0, allObs.size());
     }
 

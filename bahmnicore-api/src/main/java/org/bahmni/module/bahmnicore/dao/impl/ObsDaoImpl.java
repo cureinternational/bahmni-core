@@ -111,7 +111,7 @@ public class ObsDaoImpl implements ObsDao {
             query.append(" order by obs.obsDatetime desc ");
         }
 
-        List<Locale> localeList = getConceptNameLocales();
+        List<Locale> localeList = getLocaleList();
 
         Query queryToGetObservations = sessionFactory.getCurrentSession().createQuery(query.toString());
         queryToGetObservations.setMaxResults(limit);
@@ -137,7 +137,7 @@ public class ObsDaoImpl implements ObsDao {
         return queryToGetObservations.list();
     }
 
-    private List<Locale> getConceptNameLocales() {
+    private List<Locale> getLocaleList() {
         List<Locale> localeList = new ArrayList<>();
         localeList.add(Context.getLocale());
         if (!LocaleUtility.getDefaultLocale().equals(Context.getLocale())) {
@@ -147,14 +147,14 @@ public class ObsDaoImpl implements ObsDao {
     }
 
     @Override
-    public List<Obs> getObsByConceptAndVisits(String conceptName, List<Integer> listOfVisitIds, OrderBy sortOrder, List<String> obsIgnoreList, Boolean filterOutOrderObs) {
-        if (CollectionUtils.isEmpty(listOfVisitIds)) {
+    public List<Obs> getObsByConceptsAndVisits(List<String> conceptNames, List<Integer> listOfVisitIds, OrderBy sortOrder, List<String> obsIgnoreList, Boolean filterOutOrderObs) {
+        if (CollectionUtils.isEmpty(listOfVisitIds) || CollectionUtils.isEmpty(conceptNames)) {
             return new ArrayList<>();
         }
 
         StringBuilder query = new StringBuilder("select obs from Obs as obs, ConceptName as cn " +
                 " where cn.concept = obs.concept.conceptId " +
-                " and cn.name = :conceptName " +
+                " and cn.name in (:conceptNames) " +
                 " and cn.locale in (:locale) " +
                 " and cn.conceptNameType = :conceptNameType " +
                 " and cn.voided = false and obs.voided = false " +
@@ -172,10 +172,10 @@ public class ObsDaoImpl implements ObsDao {
             query.append(" order by obs.obsDatetime desc ");
         }
 
-        List<Locale> localeList = getConceptNameLocales();
+        List<Locale> localeList = getLocaleList();
 
         Query queryToGetObservations = sessionFactory.getCurrentSession().createQuery(query.toString());
-        queryToGetObservations.setString("conceptName", conceptName);
+        queryToGetObservations.setParameterList("conceptNames", conceptNames);
         queryToGetObservations.setParameter("conceptNameType", ConceptNameType.FULLY_SPECIFIED);
         queryToGetObservations.setParameterList("locale", localeList);
         queryToGetObservations.setParameterList("listOfVisitIds", listOfVisitIds);

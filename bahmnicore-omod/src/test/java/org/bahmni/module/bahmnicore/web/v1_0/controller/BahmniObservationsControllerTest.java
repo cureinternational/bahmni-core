@@ -1,7 +1,5 @@
 package org.bahmni.module.bahmnicore.web.v1_0.controller;
 
-import org.bahmni.module.bahmnicore.dao.BahmniConceptDao;
-import org.bahmni.module.bahmnicore.dao.VisitDao;
 import org.bahmni.module.bahmnicore.extensions.BahmniExtensions;
 import org.bahmni.module.bahmnicore.service.BahmniObsService;
 import org.bahmni.module.bahmnicore.web.contract.BahmniObservationsBatchRequest;
@@ -49,10 +47,6 @@ public class BahmniObservationsControllerTest {
     @Mock
     private VisitService visitService;
     @Mock
-    private VisitDao visitDao;
-    @Mock
-    private BahmniConceptDao bahmniConceptDao;
-    @Mock
     private BahmniExtensions bahmniExtensions;
 
     private Visit visit;
@@ -64,9 +58,8 @@ public class BahmniObservationsControllerTest {
         MockitoAnnotations.initMocks(this);
         visit = new VisitBuilder().withUUID("visitId").build();
         concept = new Concept();
-        bahmniObservationsController = new BahmniObservationsController(bahmniObsService, conceptService, visitService, visitDao, bahmniConceptDao, bahmniExtensions);
+        bahmniObservationsController = new BahmniObservationsController(bahmniObsService, conceptService, visitService, bahmniExtensions);
         when(visitService.getVisitByUuid("visitId")).thenReturn(visit);
-        when(visitDao.getVisitsByUuids(Arrays.asList("visitId"))).thenReturn(Arrays.asList(visit));
         when(conceptService.getConceptByName("Weight")).thenReturn(concept);
     }
 
@@ -193,16 +186,14 @@ public class BahmniObservationsControllerTest {
     @Test
     public void getBatch_shouldReturnObservationsGroupedByVisit() throws Exception {
         String visitUuid2 = "visitId2";
-        Visit visit2 = new VisitBuilder().withUUID(visitUuid2).build();
         List<String> visitUuids = Arrays.asList("visitId", visitUuid2);
-        when(visitDao.getVisitsByUuids(visitUuids)).thenReturn(Arrays.asList(visit, visit2));
 
         BahmniObservation obs1 = new BahmniObservationBuilder().withUuid("obs1").build();
         BahmniObservation obs2 = new BahmniObservationBuilder().withUuid("obs2").build();
         Map<String, Collection<BahmniObservation>> obsByVisitUuid = new HashMap<>();
         obsByVisitUuid.put("visitId", Arrays.asList(obs1));
         obsByVisitUuid.put(visitUuid2, Arrays.asList(obs2));
-        when(bahmniObsService.getObsByVisitsAndConcepts(Arrays.asList(visit, visit2), new ArrayList<>(), null, null, true, null))
+        when(bahmniObsService.getObsByVisitsAndConcepts(visitUuids, null, null, true, null))
                 .thenReturn(obsByVisitUuid);
 
         BahmniObservationsBatchRequest request = new BahmniObservationsBatchRequest();
@@ -218,11 +209,11 @@ public class BahmniObservationsControllerTest {
     }
 
     @Test
-    public void getBatch_shouldResolveConceptsOnceAndDelegateToServiceWithScopeLatest() throws Exception {
+    public void getBatch_shouldDelegateToServiceWithRawRequestFieldsForScopeLatest() throws Exception {
         BahmniObservation latestObs = new BahmniObservationBuilder().withUuid("latestObs").build();
         Map<String, Collection<BahmniObservation>> obsByVisitUuid = new HashMap<>();
         obsByVisitUuid.put("visitId", Arrays.asList(latestObs));
-        when(bahmniObsService.getObsByVisitsAndConcepts(Arrays.asList(visit), Arrays.asList(concept), Arrays.asList("Weight"), null, true, "latest"))
+        when(bahmniObsService.getObsByVisitsAndConcepts(Arrays.asList("visitId"), Arrays.asList("Weight"), null, true, "latest"))
                 .thenReturn(obsByVisitUuid);
 
         BahmniObservationsBatchRequest request = new BahmniObservationsBatchRequest();
@@ -235,85 +226,12 @@ public class BahmniObservationsControllerTest {
         assertEquals(1, responses.size());
         assertEquals("visitId", responses.get(0).getVisitUuid());
         assertEquals(1, responses.get(0).getObservations().size());
-        verify(bahmniObsService, times(1)).getObsByVisitsAndConcepts(Arrays.asList(visit), Arrays.asList(concept), Arrays.asList("Weight"), null, true, "latest");
-        verify(conceptService, times(1)).getConceptByName("Weight");
-    }
-
-    @Test
-    public void getBatch_shouldNotCallPerNameLookupWhenBulkConceptResolutionFindsEverything() throws Exception {
-        Concept mockedWeight = mockConceptNamed("Weight");
-        Concept mockedPulse = mockConceptNamed("Pulse");
-        when(bahmniConceptDao.getConceptsByFullySpecifiedName(Arrays.asList("Weight", "Pulse")))
-                .thenReturn(Arrays.asList(mockedWeight, mockedPulse));
-        when(bahmniObsService.getObsByVisitsAndConcepts(Arrays.asList(visit), Arrays.asList(mockedWeight, mockedPulse), Arrays.asList("Weight", "Pulse"), null, true, null))
-                .thenReturn(new HashMap<>());
-
-        BahmniObservationsBatchRequest request = new BahmniObservationsBatchRequest();
-        request.setVisitUuids(Arrays.asList("visitId"));
-        request.setConcept(Arrays.asList("Weight", "Pulse"));
-
-        bahmniObservationsController.getBatch(request);
-
-        verify(bahmniConceptDao, times(1)).getConceptsByFullySpecifiedName(Arrays.asList("Weight", "Pulse"));
-        verify(conceptService, never()).getConceptByName(anyString());
-        verify(bahmniObsService, times(1)).getObsByVisitsAndConcepts(Arrays.asList(visit), Arrays.asList(mockedWeight, mockedPulse), Arrays.asList("Weight", "Pulse"), null, true, null);
-    }
-
-    @Test
-    public void getBatch_shouldFallBackToPerNameLookupOnlyForNamesBulkResolutionMissed() throws Exception {
-        Concept mockedWeight = mockConceptNamed("Weight");
-        when(bahmniConceptDao.getConceptsByFullySpecifiedName(Arrays.asList("Weight", "Pulse")))
-                .thenReturn(Arrays.asList(mockedWeight));
-        Concept pulse = new Concept();
-        when(conceptService.getConceptByName("Pulse")).thenReturn(pulse);
-        when(bahmniObsService.getObsByVisitsAndConcepts(Arrays.asList(visit), Arrays.asList(mockedWeight, pulse), Arrays.asList("Weight", "Pulse"), null, true, null))
-                .thenReturn(new HashMap<>());
-
-        BahmniObservationsBatchRequest request = new BahmniObservationsBatchRequest();
-        request.setVisitUuids(Arrays.asList("visitId"));
-        request.setConcept(Arrays.asList("Weight", "Pulse"));
-
-        bahmniObservationsController.getBatch(request);
-
-        verify(conceptService, never()).getConceptByName("Weight");
-        verify(conceptService, times(1)).getConceptByName("Pulse");
-        verify(bahmniObsService, times(1)).getObsByVisitsAndConcepts(Arrays.asList(visit), Arrays.asList(mockedWeight, pulse), Arrays.asList("Weight", "Pulse"), null, true, null);
-    }
-
-    private Concept mockConceptNamed(String name) {
-        Concept mockedConcept = org.mockito.Mockito.mock(Concept.class);
-        org.openmrs.ConceptName mockedConceptName = org.mockito.Mockito.mock(org.openmrs.ConceptName.class);
-        when(mockedConceptName.getName()).thenReturn(name);
-        when(mockedConcept.getName()).thenReturn(mockedConceptName);
-        return mockedConcept;
-    }
-
-    @Test
-    public void getBatch_shouldResolveVisitsOnceViaBulkLookupRegardlessOfVisitCount() throws Exception {
-        List<String> visitUuids = new ArrayList<>();
-        List<Visit> visits = new ArrayList<>();
-        for (int i = 0; i < 10; i++) {
-            String uuid = "visitId" + i;
-            visitUuids.add(uuid);
-            visits.add(new VisitBuilder().withUUID(uuid).build());
-        }
-        when(visitDao.getVisitsByUuids(visitUuids)).thenReturn(visits);
-        when(bahmniObsService.getObsByVisitsAndConcepts(visits, new ArrayList<>(), null, null, true, null))
-                .thenReturn(new HashMap<>());
-
-        BahmniObservationsBatchRequest request = new BahmniObservationsBatchRequest();
-        request.setVisitUuids(visitUuids);
-
-        bahmniObservationsController.getBatch(request);
-
-        verify(visitDao, times(1)).getVisitsByUuids(visitUuids);
-        verify(visitService, never()).getVisitByUuid(anyString());
-        verify(bahmniObsService, times(1)).getObsByVisitsAndConcepts(visits, new ArrayList<>(), null, null, true, null);
+        verify(bahmniObsService, times(1)).getObsByVisitsAndConcepts(Arrays.asList("visitId"), Arrays.asList("Weight"), null, true, "latest");
     }
 
     @Test
     public void getBatch_shouldReturnEmptyObservationsWhenServiceHasNoEntryForAVisit() throws Exception {
-        when(bahmniObsService.getObsByVisitsAndConcepts(Arrays.asList(visit), new ArrayList<>(), null, null, true, null))
+        when(bahmniObsService.getObsByVisitsAndConcepts(Arrays.asList("visitId"), null, null, true, null))
                 .thenReturn(new HashMap<>());
 
         BahmniObservationsBatchRequest request = new BahmniObservationsBatchRequest();
@@ -334,8 +252,7 @@ public class BahmniObservationsControllerTest {
         List<VisitObservationsResponse> responses = bahmniObservationsController.getBatch(request);
 
         assertEquals(0, responses.size());
-        verify(visitDao, never()).getVisitsByUuids(anyList());
-        verify(bahmniObsService, never()).getObsByVisitsAndConcepts(any(List.class), any(List.class), any(List.class), any(List.class), any(Boolean.class), anyString());
+        verify(bahmniObsService, never()).getObsByVisitsAndConcepts(any(List.class), any(List.class), any(List.class), any(Boolean.class), anyString());
     }
 
     @Test
@@ -346,8 +263,7 @@ public class BahmniObservationsControllerTest {
         List<VisitObservationsResponse> responses = bahmniObservationsController.getBatch(request);
 
         assertEquals(0, responses.size());
-        verify(visitDao, never()).getVisitsByUuids(anyList());
-        verify(bahmniObsService, never()).getObsByVisitsAndConcepts(any(List.class), any(List.class), any(List.class), any(List.class), any(Boolean.class), anyString());
+        verify(bahmniObsService, never()).getObsByVisitsAndConcepts(any(List.class), any(List.class), any(List.class), any(Boolean.class), anyString());
     }
 
 }
