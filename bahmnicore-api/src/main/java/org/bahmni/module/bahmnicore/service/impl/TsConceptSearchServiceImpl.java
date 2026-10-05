@@ -36,12 +36,7 @@ public class TsConceptSearchServiceImpl implements TsConceptSearchService {
 
     @Override
     public List<SimpleObject> getConcepts(String query, Integer limit, String locale) {
-        boolean externalTerminologyServerLookupNeeded = bahmniDiagnosisService.isExternalTerminologyServerLookupNeeded();
-        if (externalTerminologyServerLookupNeeded) {
-            return new ArrayList<>();
-        } else {
-            return getDiagnosisConcepts(query, limit, locale);
-        }
+        return getDiagnosisConcepts(query, limit, locale);
     }
 
     private List<SimpleObject> getDiagnosisConcepts(String query, Integer limit, String locale) {
