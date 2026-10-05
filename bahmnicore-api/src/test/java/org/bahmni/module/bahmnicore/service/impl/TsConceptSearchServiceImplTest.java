@@ -60,11 +60,22 @@ public class TsConceptSearchServiceImplTest {
     }
 
     @Test
-    public void shouldReturnEmptyListWhenExternalTerminologyServerLookUpIsEnabled() {
+    public void shouldReturnLocalConceptsWhenExternalTerminologyServerLookUpIsEnabled() {
+        Concept malariaConcept = new Concept();
+        ConceptName malariaConceptName = new ConceptName(searchTerm, LocaleUtility.getDefaultLocale());
+        String malariaConceptUuid = "uuid1";
+        malariaConcept.setUuid(malariaConceptUuid);
+        malariaConcept.setFullySpecifiedName(malariaConceptName);
+        malariaConcept.setPreferredName(malariaConceptName);
+        ConceptSearchResult conceptSearchResult = new ConceptSearchResult(searchTerm, malariaConcept, malariaConceptName);
+
+        when(emrConceptService.conceptSearch(searchTerm, LocaleUtility.getDefaultLocale(), null, Collections.EMPTY_LIST, Collections.EMPTY_LIST, searchLimit)).thenReturn(Collections.singletonList(conceptSearchResult));
         when(bahmniDiagnosisService.isExternalTerminologyServerLookupNeeded()).thenReturn(true);
         List<SimpleObject> diagnosisList = tsConceptSearchService.getConcepts(searchTerm, searchLimit, locale);
         assertNotNull(diagnosisList);
-        assertEquals(0, diagnosisList.size());
+        assertEquals(1, diagnosisList.size());
+        assertEquals(diagnosisList.get(0).get("conceptName"), searchTerm);
+        assertEquals(diagnosisList.get(0).get("conceptUuid"), malariaConceptUuid);
     }
     @Test
     public void shouldReturnListFromEmrConceptServiceWhenExternalTerminologyServerLookUpIsNotEnabled() {
