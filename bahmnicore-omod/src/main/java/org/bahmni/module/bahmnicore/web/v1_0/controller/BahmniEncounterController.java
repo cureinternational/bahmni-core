@@ -9,6 +9,7 @@ import org.openmrs.api.EncounterService;
 import org.openmrs.api.OrderEntryException;
 import org.openmrs.module.bahmniemrapi.encountertransaction.contract.BahmniEncounterSearchParameters;
 import org.openmrs.module.bahmniemrapi.encountertransaction.contract.BahmniEncounterTransaction;
+import org.openmrs.module.bahmniemrapi.encountertransaction.exception.FormObsConflictException;
 import org.openmrs.module.bahmniemrapi.encountertransaction.mapper.BahmniEncounterTransactionMapper;
 import org.openmrs.module.bahmniemrapi.encountertransaction.service.BahmniEncounterTransactionService;
 import org.openmrs.module.emrapi.encounter.EmrEncounterService;
@@ -103,6 +104,18 @@ public class BahmniEncounterController extends BaseRestController {
         EncounterTransaction encounterTransaction = encounterTransactionMapper.map(encounter, includeAll);
         return bahmniEncounterTransactionMapper.map(encounterTransaction, includeAll);
     }
+    @ExceptionHandler(FormObsConflictException.class)
+    public ResponseEntity<Object> handleFormObsConflictException(FormObsConflictException ex) {
+        Map<String, Object> errorBody = new HashMap<>();
+        errorBody.put("code", FormObsConflictException.CODE);
+        errorBody.put("message", ex.getMessage());
+        errorBody.put("conflictingFieldPaths", ex.getConflictingFieldPaths());
+        Map<String, Object> responseBody = new HashMap<>();
+        responseBody.put("error", errorBody);
+        logger.warn("FormObsConflictException: " + ex.getMessage() + " " + ex.getConflictingFieldPaths());
+        return new ResponseEntity<Object>(responseBody, HttpStatus.CONFLICT);
+    }
+
     @ExceptionHandler(OrderEntryException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ResponseEntity<Object> handleOrderEntryException(OrderEntryException ex) {
