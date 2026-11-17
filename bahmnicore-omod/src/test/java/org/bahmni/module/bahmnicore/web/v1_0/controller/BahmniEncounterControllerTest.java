@@ -11,6 +11,7 @@ import org.openmrs.api.EncounterService;
 import org.openmrs.api.OrderEntryException;
 import org.openmrs.module.bahmniemrapi.encountertransaction.contract.BahmniEncounterSearchParameters;
 import org.openmrs.module.bahmniemrapi.encountertransaction.contract.BahmniEncounterTransaction;
+import org.openmrs.module.bahmniemrapi.encountertransaction.exception.FormObsConflictException;
 import org.openmrs.module.bahmniemrapi.encountertransaction.mapper.BahmniEncounterTransactionMapper;
 import org.openmrs.module.bahmniemrapi.encountertransaction.service.BahmniEncounterTransactionService;
 import org.openmrs.module.emrapi.encounter.EmrEncounterService;
@@ -109,6 +110,22 @@ public class BahmniEncounterControllerTest {
         Map<String, String> errorBody = (Map<String, String>) responseBody.get("error");
 
         assertEquals("[Order.cannot.have.more.than.one]", errorBody.get("message"));
+    }
+
+    @Test
+    public void shouldReturnConflictWithCodeAndFieldPathsForFormObsConflict() throws Exception {
+        bahmniEncounterController = new BahmniEncounterController(encounterService, emrEncounterService, null, bahmniEncounterTransactionService, bahmniEncounterTransactionMapper);
+
+        FormObsConflictException exception = new FormObsConflictException(java.util.Arrays.asList("Form.1/1-0", "Form.1/2-0"));
+
+        ResponseEntity<Object> response = bahmniEncounterController.handleFormObsConflictException(exception);
+
+        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        Map<String, Object> responseBody = (Map<String, Object>) response.getBody();
+        Map<String, Object> errorBody = (Map<String, Object>) responseBody.get("error");
+        assertEquals("FORM_OBS_CONFLICT", errorBody.get("code"));
+        assertEquals(java.util.Arrays.asList("Form.1/1-0", "Form.1/2-0"), errorBody.get("conflictingFieldPaths"));
+        assertEquals(exception.getMessage(), errorBody.get("message"));
     }
 
 }
